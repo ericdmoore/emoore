@@ -1,4 +1,4 @@
-import { createModule, gql } from 'graphql-modules';
+import { createModule, gql } from 'graphql-modules'
 import { loadSchemaFromFsSync } from '../loadSchema'
 import * as fs from 'fs'
 
@@ -10,6 +10,6 @@ export const linkModule = createModule({
   id: 'linkModule',
   dirname: __dirname,
   typeDefs: gql(loadSchemaFromFsSync(fs, 'link.graphql'))
-});
+})
 
 export default linkModule

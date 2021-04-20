@@ -7,7 +7,7 @@ test:
 tests: test
 	
 build-cloud: 
-	cd cloud ; npx jest tests/**/*.test.ts cloud && npm run cdk synth
+	cd cloud; npm run cdk synth
 
 build-code: 
 	npx tsc
