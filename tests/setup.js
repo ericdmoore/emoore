@@ -11,8 +11,8 @@ module.exports = async () => {
   dynamoLocal = await localDynamo.launch(undefined, port)
 
   // const credentials = new Credentials({
-  //   accessKeyId: 'NEVER_REPLACE_THIS_WITH_A_REAL_KEY',
-  //   secretAccessKey: 'NEVER_REPLACE_THIS_WITH_A_REAL_SECRET'
+  //   accessKeyId: process.env.AWS_KEY ?? 'NEVER_REPLACE_THIS_WITH_A_REAL_KEY',
+  //   secretAccessKey: process.env.AWS_SECRET ?? 'NEVER_REPLACE_THIS_WITH_A_REAL_SECRET'
   // })
 
   console.log('...started dynamo local svc on pid: ', dynamoLocal.pid)
