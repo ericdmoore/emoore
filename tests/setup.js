@@ -1,5 +1,5 @@
 const localDynamo = require('local-dynamo')
-const { DynamoDB, Credentials, SharedIniFileCredentials } = require('aws-sdk')
+const { DynamoDB } = require('aws-sdk')
 
 let dynamoLocal
 
@@ -18,7 +18,15 @@ module.exports = async () => {
   console.log('...started dynamo local svc on pid: ', dynamoLocal.pid)
   console.log(process.env)
 
-  const dyn = new DynamoDB({ region: 'us-east-1', credentials: undefined, endpoint: `http://localhost:${port}` })
+  const dyn = new DynamoDB({
+    region: 'us-east-1',
+    endpoint: `http://localhost:${port}`,
+    credentials: {
+      secretAccessKey: 'NEVER_REPLACE_THIS_WITH_A_REAL_KEY',
+      accessKeyId: 'NEVER_REPLACE_THIS_WITH_A_REAL_SECRET'
+    }
+  })
+
   await dyn.createTable({
     TableName: 'emooreAppTable',
     AttributeDefinitions: [
