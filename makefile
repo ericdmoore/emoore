@@ -18,7 +18,8 @@ build-cloud:
 build-code:
 	pwd; npx tsc
 
-build: build-code build-cloud
+build: build-code
+	@echo Built Application Code
 
 schema-gen: 
 	npx ts-node src/models/mergeSchemas.ts
