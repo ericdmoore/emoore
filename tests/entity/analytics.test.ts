@@ -41,7 +41,14 @@ const genRandClickData = async (
 beforeAll(async () => {
   console.log({ upTo400 })
 
-  const dyn = new DynamoDB({ region: 'us-east-1', endpoint: 'http://localhost:4567' })
+  const dyn = new DynamoDB({
+    region: 'us-east-1',
+    endpoint: 'http://localhost:4567',
+    credentials: {
+      secretAccessKey: 'NEVER_REPLACE_THIS_WITH_A_REAL_KEY',
+      accessKeyId: 'NEVER_REPLACE_THIS_WITH_A_REAL_SECRET'
+    }
+  })
   const localDC = new DynamoDB.DocumentClient({ service: dyn })
 
   // mutaes appTable

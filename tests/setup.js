@@ -16,7 +16,7 @@ module.exports = async () => {
   // })
 
   console.log('...started dynamo local svc on pid: ', dynamoLocal.pid)
-  console.log(process.env)
+  // console.log(process.env)
 
   const dyn = new DynamoDB({
     region: 'us-east-1',
