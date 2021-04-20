@@ -22,6 +22,7 @@
     "@aws-cdk/assert": "^1.98.0",
     "@aws-cdk/aws-applicationautoscaling": "^1.98.0",
     "@aws-cdk/aws-dynamodb": "^1.98.0",
+    "@aws-cdk/aws-iam": "^1.98.0",
     "@aws-cdk/aws-s3": "^1.98.0",
     "@aws-cdk/aws-s3-assets": "^1.98.0",
     "@aws-cdk/aws-s3-deployment": "^1.98.0",
