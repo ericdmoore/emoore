@@ -10,13 +10,14 @@ module.exports = async () => {
 
   dynamoLocal = await localDynamo.launch(undefined, port)
 
-  const credentials = process.env.AWS_KEY && process.env.AWS_SECRET
-    ? new Credentials({ accessKeyId: process.env.AWS_KEY, secretAccessKey: process.env.AWS_SECRET })
-    : new SharedIniFileCredentials({ profile: 'default' })
+  // const credentials = new Credentials({
+  //   accessKeyId: 'NEVER_REPLACE_THIS_WITH_A_REAL_KEY',
+  //   secretAccessKey: 'NEVER_REPLACE_THIS_WITH_A_REAL_SECRET'
+  // })
 
   console.log('...started dynamo local svc on pid: ', dynamoLocal.pid)
 
-  const dyn = new DynamoDB({ region: 'us-east-1', credentials, endpoint: `http://localhost:${port}` })
+  const dyn = new DynamoDB({ region: 'us-east-1', credentials: undefined, endpoint: `http://localhost:${port}` })
   await dyn.createTable({
     TableName: 'emooreAppTable',
     AttributeDefinitions: [
