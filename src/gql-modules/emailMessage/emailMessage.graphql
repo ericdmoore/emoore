@@ -1,0 +1,237 @@
+#lint-disable defined-types-are-used  type-fields-sorted-alphabetically
+"""
+PageInfo: Per the Relay Spec
+"""
+type PageInfo{
+    
+    """
+    Has Next Page: Can Go Forward
+    """
+	hasNextPage: Boolean!
+    
+    """
+    Has Previous Page: Can Go Back
+    """
+	hasPreviousPage: Boolean!
+    
+    """
+    Start Cursor: First Page Token
+    """
+    startCursor: String!
+    
+    """
+    End Cursor: Last Page Token
+    """
+    endCursor: String!
+}
+
+"""
+DateRange: Start and Finish Times in epoch-ms time
+"""
+type NumberRange{
+    """
+    Start: epoch-ms timestamp
+    """
+	start: Int
+    """
+    End: epoch-ms timestamp
+    """
+	end: Int
+}
+
+"""
+MailQueryInputFilter: Filters for Mail Searching
+"""
+input MailQueryInputFilter{
+    """
+    Accounts: List of Accounts to scope a search to.
+    """
+    Accounts: String[]
+    
+    """
+    BodyContains: string of key word searches
+    """
+    BodyContains: String
+    
+    """
+    Expecting Reply: Was the email sent where you are expecting a reply
+    """
+    ExpectingReply: Boolean
+    
+    """
+    ExpiresInSec: Find Mail that will expire in X seconds.
+    """
+    ExpiresInSec: Int
+    
+    """
+    From: list of sender address patterns
+    """
+    From: [String!]
+    
+    """
+    Has Alias Subject: Since we can rename our subject line
+    """
+    HasAliasedSubject: Boolean
+
+    """
+    Has Attachment: Filter out for emails with or without attachments
+    """
+    HasAttachment: Boolean
+
+    """
+    Has Attachment Extension: file extension
+    """
+    HasAttachmentExt: [String]
+
+
+    """
+    Has Calendar Event: Was a calendar event included in the text.
+    """
+    HasCalendarEvent: Boolean
+
+    """
+    Has Contact Card: Email's sent with vcard metadata will be True
+    """
+    HasContactCard: Boolean
+
+    """
+    Has Contact Card: Email's sent with vcard metadata will be True
+    """
+    HasLabels: Boolean
+
+    """
+    Has New Contact: Is there a contact in the email not represented by a Contact or SenderProfile
+    """
+    HasNewContact: Boolean # Adding the Contact Info Boots it from filter
+
+    """
+    Has Contact Card: Email's sent with vcard metadata will be True
+    """
+    HasPasscodeSubject: Boolean
+
+    """
+    Has Star: Is the Email Message Starred
+    """
+    HasStar: Boolean
+
+    """
+    Has Sticky Notes: Since Users can add private sticky notes to email messages... this predicate is to find or hide those
+    """
+    HasStickyNotes: Boolean
+    
+    """
+    Includes Link To Domains: List of links to look for
+    """
+    IncluedsLinkToDomains: String[]
+    
+    """
+    Is In News Corner: Look in the news Corner
+    """
+    IsInNewsCorner: Boolean
+
+    """
+    Is In Paper Trail: Is this EmailMessage Supposed to be in the Paper Trail
+    """
+    IsInPaperTrail: Boolean
+    
+    """
+    Is Read: Read or Unread
+    """
+    IsRead: Boolean
+    
+    """
+    Is Snoozed: True or False
+    """
+    IsSnoozed: Boolean 
+    
+    """
+    Is Stared: True/False
+    """
+    IsStarred: Boolean 
+    
+    """
+    ReadWithinDateRange: start / end
+    """
+    ReadWithinDateRange: NumberRange
+
+    """
+    ReceivedWithinDateRange: start / end
+    """
+    ReceivedWithinDateRange: NumberRange
+
+    """
+    Reply Is Overdue Days: Number of Days
+    """
+    ReplyIsOverdueDays: Int
+
+    """
+    SentWithinDateRange: start/end
+    """
+    SentWithinDateRange: NumberRange
+
+    """
+    SizekB: start/end
+    """
+    SizekB: NumberRange
+
+    """
+    Subject Contains: String Pattern
+    """
+    SubjectContains: String
+
+    """
+    Stared With: Star Type String
+    """
+    StaredWith: String
+
+    """
+    To: account list filter
+    """
+    To: [String!]
+
+    
+    """
+    With Any Labels: list of label strings
+    """
+    WithAnyLabels: [String!]
+
+    """
+    With Subject Passcode: Passcode Strings
+    """
+    WithSubjectPasscodes: [String!]
+}
+
+
+"""
+Email Message Edge:
+"""
+type EmailMessageEdge{
+   """
+   Node: EMail Message the Node
+   """
+   node: EmailMessage!
+   """
+   Cursor: How to pick up at this node
+   """
+   cursor: String
+}
+
+"""
+Email Message Connection: Relay Spec Connection
+"""
+type EmailMessageConnection{
+    """
+    Edges: Relay Spec Connection
+    """
+    edges: EmailMessageEdge[]!
+    
+    """
+    Page Info: 
+    """
+    pageInfo: PageInfo
+
+    """
+    Total Count: 
+    """
+    totalCount: String!
+}

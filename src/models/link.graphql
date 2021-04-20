@@ -1,0 +1,398 @@
+# >> link.graphql
+
+
+""" 
+Time Resolutions
+"""
+enum TimeResolution{
+    """
+    Group By Day - ex: All Events from Jan-01-2021
+    """
+    DAY
+
+    """
+    Group By Hour - ex: All Events from Jan-01-2021 4am GMT
+    """
+    HOUR
+
+    """
+    Group By Minute - ex: All Events from Jan-01-2021 4:42am GMT
+    """
+    MINUTE
+
+    """
+    Group By Month - ex: All Events from Jan-2021
+    """
+    MONTH
+
+    """
+    Group By Year - ex: All Events from 2020
+    """
+    YEAR
+}
+
+"""
+Device Form Factors 
+"""
+enum DeviceFormFactor {
+    """
+    A Server Console
+    """
+    CONSOLE
+    
+    """
+    Embeded Device
+    """
+    EMBEDED
+
+    """
+    A Mobile Devices
+    """
+    MOBILE 
+    
+    """
+    A Smart TV
+    """
+    SMARTTV
+
+    """
+    A Tablet
+    """
+    TABLET
+
+    """
+    A Wearable
+    """
+    WEARABLE
+}
+
+extend type Query{
+    """
+    Peek: at the short link to see its expanded form with out counting a click
+    """
+    linkPeek(
+        """
+        Provide the ShortURL path ID (not the whole URL)
+        """
+        short:ID!
+    ) : Link
+
+    """
+    Raw Click Histories - where each node is a Click Array
+    """
+    linkClickHistory(
+        """ 
+        The ShortURL path ID
+        """
+        short:String!
+
+        """
+        Last Limit - goes with Before
+        """
+        last: Int
+        """
+        A start Time - epoch time
+        """
+        before: String
+
+
+        """
+        First Limit - goes with AFTER
+        """
+        first: Int
+        """
+        An End Time - epoch time
+        """
+        after: String
+    ): ClickConnection
+
+    """
+    Get The Click History: for a given short link
+    """
+    linkClickCounts(
+        """ 
+        The ShortURL path ID
+        """
+        short:String!,
+        
+        """
+        A Time Resolution Used for Group By
+        """
+        by:TimeResolution!,
+        
+
+        """
+        Last Limit - goes with Before
+        """
+        last: Int
+        """
+        A start Time - epoch time
+        """
+        before: String
+
+
+        """
+        First Limit - goes with AFTER
+        """
+        first: Int
+        """
+        An End Time - epoch time
+        """
+        after: String
+    ): CountedClickConnection
+    
+    """
+    Get The Geo Report: for a given short link, for all time
+    """
+    linkGeoHistory(
+        """ 
+        short URL pathID
+        """
+        short:String!
+    ) : [Geo]
+}
+
+extend type Mutation{
+    """
+    Expand the short link and count a click
+    """
+    linkExpand(
+        """ 
+        short URL pathID
+        """
+        short:String
+    ) : Link
+
+    """
+    Create a new short link
+    """
+    linkCreate(
+        """
+        Provide a batch of Link Pairs
+        """
+        batch: [LinkInput]
+    ): [Link]
+}
+
+"""
+Link Pairs
+"""
+input LinkInput {
+    """
+    Long URL that is - becomes shortened
+    """
+    long: String!
+    
+    """
+    Potential short/vanity URL to shorten the long link with
+    """
+    short: String
+}
+
+""" 
+A Click is an atomic unit of a ClickHistory
+"""
+type Click{
+
+    """
+    Epoch date time
+    """
+    date: Int
+
+    """
+    Geo Strings from IP 
+    """
+    geosFromIP: [Geo]
+    # ip: String
+
+    """ 
+    Probabiltiy of being a bot
+    """
+    pIsBot: Float
+
+    """ 
+    Parsed User Agent
+    """
+    ua: UA
+
+    """ 
+    Raw User Agent
+    """
+    userAgentRaw: String
+}
+
+"""
+Click Edge 
+"""
+type ClickEdge{
+    
+    """
+    Cursor
+    """
+    cursor: String
+    
+    """
+    Node - Click Array
+    """
+    node: [Click]
+}
+
+"""
+Click Connection 
+"""
+type ClickConnection{
+   
+    """
+    Edge
+    """
+    edges: [ClickEdge]
+
+    """
+    Page Info
+    """
+    pageInfo: PageInfo!
+}
+
+""" 
+Counted Clicks
+"""
+type CountedClicks{
+    """ 
+    Bucket ID
+    """
+    bucketID: String
+    
+    """ 
+    BucketResolution
+    """
+    bucketResolution: TimeResolution
+    
+    """ 
+    Bucket ID
+    """
+    totalCount: Int
+}
+
+""" 
+Counted Clicks Connection
+"""
+type CountedClickConnection{
+    """ 
+    Counted Click Edges
+    """
+    edges: [CountedClickEdge]
+    """ 
+    Counted Click PageInfo
+    """
+    pageInfo: PageInfo!
+}
+
+""" 
+Counted Click Edge Type
+"""
+type CountedClickEdge{
+    """ 
+    Cursor for the Node
+    """
+    cursor: String
+    
+    """ 
+    Underlyng Data Node
+    """
+    node: CountedClicks
+}
+
+""" 
+Parsaed User Agent Info
+"""
+type UA{
+    """
+    Browser Rendering Engine - ex: 'Gecko'
+    """
+    browserEngine: String
+    
+    """
+    Rendering Engine Version - Follows any structure given by the rendering engine
+    """
+    browserEngineVersion: String
+    
+    """
+    Browser Name - ex:'Firefox'
+    """
+    browserName: String
+    
+    """
+    Browser Version - ex: 86.52.2523525
+    """
+    browserVersion: String
+    
+    """
+    Device CPU Architecture - ex: 'arm64'
+    """
+    deviceCpuArch: String
+
+    """
+    Device Operating System
+    """
+    deviceModel: String
+
+    """
+    Device Operating System - ex: 'iOS'
+    """
+    deviceOs: String
+    
+    """
+    Device OS Version Number ex: '14.4.2'
+    """
+    deviceOsVersion: String  
+    
+    """
+    Device Type / Form Factor - ex: 'tablet'
+    """
+    deviceType: DeviceFormFactor
+}
+
+"""
+Hierarchical Geographies
+"""
+type Geo{
+    """
+    Type of Region, that usually are nested down, to the place
+    """
+    regionType: String # Usually  TimeZone > Country > State/Territory > Congressional District > County > Zip Code > City > Neighborhood
+    
+    """
+    The name of the region - ex: {regionType: Country, value: 'USA'}
+    """
+    value: String
+}
+
+"""
+Definition for a Shortened Link
+"""
+type Link {
+    """
+    The shortened version of the link
+    """
+    createdByUser: String
+
+    """
+    The shortened version of the link
+    """
+    createdDate: Int
+
+    """
+    The shortened version of the link
+    """
+    long: String!
+
+    """
+    The shortened version of the link
+    """
+    modfiedDate: Int
+
+    """
+    The shortened version of the link
+    """
+    short: ID
+}

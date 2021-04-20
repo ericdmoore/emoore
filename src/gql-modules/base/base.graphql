@@ -1,0 +1,81 @@
+#lint-disable defined-types-are-used  type-fields-sorted-alphabetically
+"""
+Me: Reflect the Authentication Info
+"""
+type Me{
+    """
+    Name: of the authenticated user 
+    """
+    name: String
+
+    """
+    Owned Inboxes: of the authenticated user 
+    """
+    ownedInboxes: [String!]
+
+    """
+    Settings: of the authenticated user 
+    """
+    settings: String
+
+    """
+    Shared Inboxes: available to the authenticated user
+    """
+    sharedInboxes: [String!]
+}
+
+"""
+PageInfo: Relay Spec
+"""
+type PageInfo{
+    """
+    Start Cursor: Token for Last Page
+    """
+    endCursor: String!
+
+    """
+    Has Next Page: Can paginated forwards
+    """
+    hasNextPage: Boolean!
+
+    """
+    Has Previous Page: Can paginated backwards
+    """
+    hasPreviousPage: Boolean!
+
+    """
+    Start Cursor: Token for Starting Page
+    """
+    startCurosr: String!
+}
+
+"""
+Query: 
+"""
+type Query {
+    """
+    Me: Show back my info
+    """
+    me:Me
+}
+
+"""
+Mutation: Changing State
+"""
+type Mutation {
+    """
+    Update Profile: update my profile
+    """
+    updateProfile(
+        
+        """
+        Name: 
+        """
+        name:String, 
+
+        """
+        Settings: 
+        """
+        settings:String
+    ):Me
+}

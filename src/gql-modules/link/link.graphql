@@ -1,0 +1,68 @@
+"""
+Link: is a redirecting URL pair
+"""
+type Link {
+  """
+  CreateDate: is epoch-ms timestamp of creation 
+  """
+  createDate: Int!
+
+  """
+  LongURL: is the destination URL
+  """
+  longURL: String!
+  
+  """
+  ShortURL: is the shortened handle
+  """
+  shortURL: String!
+}
+
+"""
+Query: Fetch Data
+"""
+extend type Query {
+    """
+    GetRandURL: Get a Random URL
+    """
+    getRandURL: String
+   
+    """
+    Expand: Get the long link - 
+    """
+    hasShortURL(
+      """
+      Expand: Get the long link - 
+      """
+      longURL: String
+    ):Boolean
+   
+    """
+    Expand: Get the long link - and has a side effect of adding a new count to the click history
+    """
+    expand(
+      """
+      Expand: Get the long link - 
+      """
+      shortURL: String!
+    ):Link 
+}
+
+"""
+Mutation: Changing State
+"""
+extend type Mutation {
+    """
+    MakeShortURL: Make a longURL with optional vanity
+    """
+    makeShortURL (
+      """
+      LongURL*: url string
+      """
+      longURL: String! 
+      """
+      shortURL: (optional) vanitiy url
+      """
+      shortURL: String
+    ): Link
+}

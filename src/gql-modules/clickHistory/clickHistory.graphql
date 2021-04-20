@@ -1,0 +1,131 @@
+# lint-disable type-fields-sorted-alphabetically
+
+"""
+ClickEventDuration: Click Event Durations
+"""
+type ClickEventInterval {
+    
+    """
+    End(epoch-ms): timestamp of when the interval ends 
+    """
+    end: Int!
+    
+    """
+    Duration(ms): end - start in ms
+    """
+    duration: Int!
+    
+    """
+    SegmentedBy(m,h,d):
+    """
+    segmentedBy: String!
+    
+    """
+    Start(epoch-ms): starting timestamp of interval
+    """
+    start: Int!
+    
+    """
+    Total: Number of Counted Clicks
+    """
+    total: Int!
+}
+
+"""
+IntervalEdge: Pagingation Unit for Event Intervals
+"""
+type IntervalEdge {
+    """
+    Cursor: For Relay-spec pagintion
+    """
+    cursor: String!
+
+    """
+    Node: For Relay-spec pagintion
+    """
+    node: ClickEventInterval
+}
+
+"""
+Interval Connection: For Relay-spec pagintion
+"""
+type IntervalConnection {
+    """
+    Edges: For Relay-spec pagintion
+    """
+    edges: [IntervalEdge]
+    
+    """
+    PageInfo: For Relay-spec pagintion
+    """
+    pageInfo: PageInfo!
+} 
+
+extend type Link {
+    """
+    ClickHist: Click History for the link in context
+    """
+    clickHist(
+        """
+        SegmentedBy: s m, h, D
+        """
+        segmentedBy: String!, 
+
+        """
+        First: Forward Page Size - works with 'First N After X'
+        """
+        first: Int,
+
+        """
+        After: Starting Cursor value::X - works with 'First N After X'
+        """
+        after: String, 
+        
+        """
+        Last: Reverse Page Size - works with 'Last N Before X'
+        """
+        last: Int,
+        
+        """
+        Before: Starting Cursor value:X - works with 'Last N Before X'
+        """
+        before: String):
+    IntervalConnection
+}
+
+extend type Query {
+    """
+    GetClickHist: look up the click activity for any shortURL
+    """
+    getClickHist(
+        """
+        ShortURL: exmple- https://example.com/a1b2c3
+        """
+        shortURL: String!, 
+        
+        """
+        SegmentedBy: Time Dimension Group By - s,m,h,D
+        """
+        segmentedBy: String!,
+
+        """
+        First - Forward Page Size:N - for 'First N after X'
+        """
+        first: Int,
+
+        """
+        After: Forward Cursor Value:X - for 'First N after X'
+        """
+        after: String, 
+
+        """
+        Last: Reverse Cursor Value:X - for 'Last N Before X'
+        """
+        last: Int,
+
+        """
+        Before: Reverse Cursor Value:X - for 'Last N Before X'
+        """
+        before: String
+    ): IntervalConnection
+}

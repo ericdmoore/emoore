@@ -1,0 +1,28 @@
+# Single Table Design
+# 
+# pk = 'pk'
+# sk = 'sk'
+
+Notes:
+  Data Acess Patterns: 
+  - Take me to this link
+  - Rough Click counts
+  - Supports Vanity links
+
+
+Table Sketch:
+- // pk $$ sk : -> data type and -- is ":" replacement
+- // pk--S $$ sk--S : -> goes to the value
+- // : 
+- IN#<URL> $$ IN#<URL>: -> S #< external URL string >
+- IN#<URL> $$ _click : "-> {ts:N, ip:S, UA:S, cookies: SS }"  # timestamp
+
+
+Reserve Words:
+- <link>/_/*
+- <link>/^[a-zA-Z0-9]{3,}$/
+- <link>/data/*
+
+
+DotR:
+- any link ".r" will show stats of the shortened link
