@@ -29,6 +29,7 @@
     "aws-cdk": "^1.98.0",
     "aws-sdk": "^2.885.0",
     "cdk-assets": "^1.98.0",
+    "constructs": "^3.3.71",
     "dotenv": "^8.2.0",
     "source-map-support": "^0.5.16"
   }
