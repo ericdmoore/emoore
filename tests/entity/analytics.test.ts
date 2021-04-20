@@ -1,14 +1,8 @@
 /* globals test beforeAll  expect */
-// import type { ChildProcess } from 'child_process'
 
 import { DynamoDB } from 'aws-sdk'
-// import localDynamo from 'local-dynamo'
-
 import { appTable, click } from '../../src/entities'
 import chunky from '../../src/utils/batchChunks'
-// import dateFmt from '../../src/utils/dateFmt'
-
-// let dynamoLocal: ChildProcess
 
 const msInDays = (n: number) => n * 24 * 3600_000
 const randInt = (asBigAs:number) => Math.floor(Math.random() * asBigAs)
@@ -44,40 +38,18 @@ const genRandClickData = async (
   }
 }
 
-// afterAll(() => dynamoLocal.kill('SIGTERM'))
-
 beforeAll(async () => {
   console.log({ upTo400 })
-  // start local Dynamo Svc
-  // and set the internals of the Entity framework to use the locally configured reader/writer
-  // dynamoLocal = await localDynamo.launch(undefined, 4567)
+
   const dyn = new DynamoDB({ region: 'us-east-1', endpoint: 'http://localhost:4567' })
   const localDC = new DynamoDB.DocumentClient({ service: dyn })
 
   // mutaes appTable
-  appTable.DocumentClient = localDC
   // in case they are not connected
+  appTable.DocumentClient = localDC
   click.ent.table.DocumentClient = localDC
 
-  // await dyn.createTable({
-  //   TableName: 'emooreAppTable',
-  //   AttributeDefinitions: [
-  //     { AttributeName: 'pk', AttributeType: 'S' },
-  //     { AttributeName: 'sk', AttributeType: 'S' }
-  //   ],
-  //   KeySchema: [
-  //     { AttributeName: 'pk', KeyType: 'HASH' },
-  //     { AttributeName: 'sk', KeyType: 'RANGE' }
-  //   ],
-  //   BillingMode: 'PAY_PER_REQUEST',
-  //   ProvisionedThroughput: {
-  //     ReadCapacityUnits: 5,
-  //     WriteCapacityUnits: 5
-  //   }
-  // }).promise()
-
   const zero = ts
-
   await genRandClickData(upTo400, zero, zero - msInDays(1)) // [now - 1d ago] with upTo400 Clicks
   await genRandClickData(upTo400, zero - msInDays(1), zero - msInDays(4)) // [1d ago - 4d ago]
   await genRandClickData(upTo400, zero - msInDays(4), zero - msInDays(14)) // [4d ago - 14d ago]

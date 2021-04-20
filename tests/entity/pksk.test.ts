@@ -127,7 +127,7 @@ test('Click - DynDB Inputs', async () => {
   expect(r).toHaveProperty('Key.pk')
   expect(r).toHaveProperty('Key.sk')
   expect(r.Key.pk).toBe(click.pk({ short }))
-  expect(r.Key.sk.slice(0, 9)).toBe(click.sk({ ts: time }).slice(0, 9))
+  expect(r.Key.sk.slice(0, 8)).toBe(click.sk({ ts: time }).slice(0, 8))
 })
 
 test('User - DynDB Inputs', async () => {

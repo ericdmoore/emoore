@@ -10,8 +10,10 @@ module.exports = async () => {
   console.log(cmd)
   const r = await execP(cmd)
 
-  console.log('...found on PID:', r)
-  cmd = `kill ${r.stdout.toString().trim()}`
-  console.log(cmd)
+  const pid = r.stdout.toString().trim()
+  console.log('...found svc on PID:', pid)
+  console.log(`tearing down local dynamo service - kill:${pid}`)
+  cmd = `kill ${pid}`
   await execP(cmd)
+  console.log('\n\n\n')
 }
