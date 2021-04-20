@@ -35,6 +35,6 @@ jobs:
       run: make test
       env:
         AWS_KEY: ${{ secrets.AWS_KEY }}
-        AWS_SDK_LOAD_CONFIG: 1
+        AWS_SDK_LOAD_CONFIG: 0
         AWS_SECRET: ${{ secrets.AWS_SECRET }}
       
