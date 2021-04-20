@@ -9,13 +9,13 @@ tests: test
 pwd: 
 	pwd
 
-cloud-install:
+cloud-install: 
 	cd cloud; npm i
 
-build-cloud: 
+build-cloud: pwd 
 	cd cloud; npm run cdk synth
 
-build-code: 
+build-code: pwd
 	npx tsc
 
 build: build-code build-cloud
