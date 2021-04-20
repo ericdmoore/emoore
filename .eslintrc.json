@@ -16,6 +16,7 @@
         "jest"
     ],
     "rules": {
-        "no-tabs": 0
+        "no-tabs": "off",
+        "no-new": "off"
     }
 }
