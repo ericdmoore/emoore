@@ -12,11 +12,11 @@ pwd:
 cloud-install: 
 	cd cloud; npm i
 
-build-cloud: pwd 
-	cd cloud; npm run cdk synth
+build-cloud: 
+	cd cloud; pwd; npx cdk synth
 
-build-code: pwd
-	npx tsc
+build-code:
+	pwd; npx tsc
 
 build: build-code build-cloud
 
