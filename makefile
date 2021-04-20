@@ -13,7 +13,7 @@ cloud-install:
 	cd cloud; npm i
 
 build-cloud: 
-	cd cloud; pwd; npx cdk synth
+	cd cloud; pwd; npm run build; npx cdk synth
 
 build-code:
 	pwd; npx tsc

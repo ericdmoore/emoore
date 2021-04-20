@@ -4,6 +4,8 @@ import * as cdk from '@aws-cdk/core'
 import { CloudStack } from '../lib/cloud-stack'
 
 import { config } from 'dotenv'
+
+// eslint-disable-next-line no-unused-vars
 const processenv = config()
 
 ;(async () => {
