@@ -6,6 +6,9 @@ test:
 
 tests: test
 
+pwd: 
+	pwd
+
 cloud-install:
 	cd cloud; npm i
 
@@ -31,4 +34,7 @@ schema-check: schema-lint schema-inspect
 
 list:
 	@echo Listing the make commands...
+	@echo 
 	cat makefile | grep ":" | tail -r | awk 'NR>2{ print }' | tail -r
+	@echo 
+	@echo 
