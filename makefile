@@ -7,7 +7,7 @@ test:
 tests: test
 
 cloud-install:
-	cd cloud; npm ci
+	cd cloud; npm i
 
 build-cloud: 
 	cd cloud; npm run cdk synth
