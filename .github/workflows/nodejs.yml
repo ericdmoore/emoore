@@ -27,6 +27,8 @@ jobs:
         node-version: ${{ matrix.node-version }}
     - name: Clean Install
       run: npm ci
+    - name: Install Cloud Deps
+      run: make cloud-install
     - name: Build
       run: make build
     - name: Test 

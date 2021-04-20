@@ -5,7 +5,10 @@ test:
 	npx jest tests/*.test.ts tests/**/*.test.ts --coverage
 
 tests: test
-	
+
+cloud-install:
+	cd cloud; npm ci
+
 build-cloud: 
 	cd cloud; npm run cdk synth
 
