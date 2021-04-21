@@ -25,17 +25,17 @@ export const dateFmt = (fmt:string = 'YYYYMMDDHH') => {
   const tenMinBlockChars = ['0', '1', '2', '3', '4', '5']
   return (epoch:number) => {
     const d = new Date(epoch)
-    const YYYY = d.getFullYear().toString()
-    const YY = p2(d.getFullYear().toString().slice(-2))
-    const MM = p2((d.getMonth() + 1).toString())
-    const DD = p2(d.getDate().toString())
-    const HH = p2(d.getHours().toString())
-    const mm = p2(d.getMinutes().toString())
-    const ss = p2(d.getSeconds().toString())
-    const qhr = quaterHrChars[Math.floor(d.getMinutes() / 15)]
-    const tmb = tenMinBlockChars[Math.floor(d.getMinutes() / 10)]
-    const H = p2((d.getHours() % 12).toString())
-    const ampm = d.getHours() > 11 ? 'pm' : 'am'
+    const YYYY = d.getUTCFullYear().toString()
+    const YY = p2(d.getUTCFullYear().toString().slice(-2))
+    const MM = p2((d.getUTCMonth() + 1).toString())
+    const DD = p2(d.getUTCDate().toString())
+    const HH = p2(d.getUTCHours().toString())
+    const mm = p2(d.getUTCMinutes().toString())
+    const ss = p2(d.getUTCSeconds().toString())
+    const qhr = quaterHrChars[Math.floor(d.getUTCMinutes() / 15)]
+    const tmb = tenMinBlockChars[Math.floor(d.getUTCMinutes() / 10)]
+    const H = p2((d.getUTCHours() % 12).toString())
+    const ampm = d.getUTCHours() > 11 ? 'pm' : 'am'
     const hh = `${H}${ampm}`
 
     return fmt
