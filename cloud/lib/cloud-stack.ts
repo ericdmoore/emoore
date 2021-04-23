@@ -1,25 +1,47 @@
-import * as cdk from '@aws-cdk/core';
+import * as cdk from '@aws-cdk/core'
 import * as s3 from '@aws-cdk/aws-s3'
-import * as dynamodb from '@aws-cdk/aws-dynamodb';
-import { Bucket } from '@aws-cdk/aws-s3';
+import * as lambda from '@aws-cdk/aws-lambda'
+import * as dynamodb from '@aws-cdk/aws-dynamodb'
+import { Bucket } from '@aws-cdk/aws-s3'
+import bundleCDKFunction, { BundleOpts, BaseFuncOpts } from './nodeFunction'
+// import * as s3assets from '@aws-cdk/aws-s3-assets' // file -> object
+// import * as s3deploy from '@aws-cdk/aws-s3-deployment' // dir -> buckets
 
-import * as s3assets from '@aws-cdk/aws-s3-assets' // file -> object
-import * as s3deploy from '@aws-cdk/aws-s3-deployment' // dir -> buckets
+// #region interfaces
 
+type Dict<T> = {[key:string]:T}
+interface AddFunctionDefs{
+  base:BaseFuncOpts
+  bundle?: BundleOpts
+  func?:lambda.FunctionProps
+}
+
+// #endregion interfaces
 export class CloudStack extends cdk.Stack {
+  scope: cdk.Construct
   table: dynamodb.Table
   bucket: s3.Bucket
-  
-  constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
-    super(scope, id, props);
+  functions: {[name:string]:lambda.Function} = {}
 
+  constructor (scope: cdk.Construct, id: string, props?: cdk.StackProps) {
+    super(scope, id, props)
+
+    this.scope = scope
     this.table = new dynamodb.Table(this, 'EmooreAppTable', {
       tableName: 'emooreAppTable',
       partitionKey: { name: 'pk', type: dynamodb.AttributeType.STRING },
-      sortKey: { name:'sk',type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-    }); 
+      sortKey: { name: 'sk', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST
+    })
+    this.bucket = new Bucket(this, 'fileBucket', { bucketName: 'emoore-links' })
+  }
 
-    this.bucket = new Bucket(this, 'fileBucket', {bucketName:'emoore-links'}) 
+  async addBundledFunctions (funcs: Dict<AddFunctionDefs>) {
+    await Promise.all(
+      Object.entries(funcs)
+        .map(
+          ([id, v]) => bundleCDKFunction(this.scope, id, v.base, v.bundle, v.func)
+        )
+    )
   }
 }

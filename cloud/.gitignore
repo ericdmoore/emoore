@@ -7,3 +7,7 @@ node_modules
 .cdk.staging
 cdk.out
 .env
+
+# sscrets will be injected
+fnPkgs/
+dist/

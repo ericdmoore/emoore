@@ -1,4 +1,4 @@
-# CDK-TS for Emoore
+# Cdk-ts for https://emoo.re
 
 Cloud Infrastructure for `emoo.re` links
 

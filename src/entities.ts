@@ -1,13 +1,19 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type * as k from './types'
-import { DynamoDB, SharedIniFileCredentials } from 'aws-sdk'
+import { DynamoDB, Credentials, SharedIniFileCredentials } from 'aws-sdk'
 import { Table, Entity } from 'dynamodb-toolbox'
 import { EntityAttributes } from 'dynamodb-toolbox/dist/classes/Entity'
 import dateFmt from './utils/dateFmt'
 import ksuid from 'ksuid'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 
-const credentials = new SharedIniFileCredentials({ profile: 'default' })
+const credentials = process.env.AWS_KEY && process.env.AWS_SECRET
+  ? new Credentials({
+    accessKeyId: process.env.AWS_KEY,
+    secretAccessKey: process.env.AWS_SECRET
+  })
+  : new SharedIniFileCredentials({ profile: 'default' })
+
 const DocClient = new DynamoDB.DocumentClient({ credentials, region: 'us-west-2' })
 
 // #region interfaces
