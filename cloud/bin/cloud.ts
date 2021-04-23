@@ -27,8 +27,8 @@ const processenv = config().parsed ?? {}
 
   const cdkFunctions = new Functions(cdkStack, 'id', 'dist')
   cdkFunctions.addMoreFuncs(basePaths, {
-    root: { src: ['root.ts'] },
-    graphql: { src: ['graphql.ts'] }
+    root: ['root.ts'],
+    graphql: ['graphql.ts']
   })
 
   const funcMap = await cdkFunctions.makeLambdas({}, {

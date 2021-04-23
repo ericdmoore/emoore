@@ -74,7 +74,7 @@ export class Functions extends cdk.Construct {
 
       zipPaths: Object.entries(srcs).reduce((p, [ƒnName, val]) =>
         Array.isArray(val)
-          ? ({ ...p, [ƒnName]: resolve(...zipBasePaths, ...val) }) // simple string opt
+          ? ({ ...p, [ƒnName]: swapExt(resolve(...zipBasePaths, ...val)) }) // simple string opt
           : val.zip
           // take the path parts - resolve into full path, for ƒnName
             ? ({ ...p, [ƒnName]: resolve(...zipBasePaths, ...val.zip) }) // has a zip opt
@@ -97,8 +97,6 @@ export class Functions extends cdk.Construct {
         ...p,
         [name]: resolve(join(this.distPath, name, name + '.js'))
       }), {})
-
-    // printJSON(this.props)
 
     return Promise.all(
       Object.entries(this.props.srcPaths).map(([name, srcPath]) =>
@@ -139,6 +137,8 @@ export class Functions extends cdk.Construct {
   async makeLambdas (applyFnConfig: Dict<Partial<lambda.FunctionProps>> = {}, applyBuildOpts: BuildOptions = {}, grantMap: Dict<string> = {}) : Promise<Dict<lambda.Function>> {
     await this.esbuildBundleToDist(applyBuildOpts)
     await this.zipBundles()
+
+    // printJSON(this.props)
 
     return Object.entries(this.props.zipPaths)
       .reduce(async (p, [name, path]: [string, PathUnion]) => ({
