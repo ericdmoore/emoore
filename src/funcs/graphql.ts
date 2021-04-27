@@ -21,7 +21,7 @@ import { schemaFromGlobs, resolversFromGlobs } from '../merged'
 // to reduce bundle size - this adding it that way will almost certainly
 // cut them into some runtime module resolution - ;|
 
-export const index: Func = async (event, context) => {
+export const handler: Func = async (event, context) => {
   const server = new ApolloServer({
     typeDefs: gql(await schemaFromGlobs()),
     resolvers: await resolversFromGlobs(),
@@ -37,4 +37,4 @@ export const index: Func = async (event, context) => {
   }).catch(console.error) as Ret
 }
 
-export default index
+export default handler

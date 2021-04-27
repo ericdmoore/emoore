@@ -13,11 +13,6 @@ import { build as esbuild } from 'esbuild'
 // #region interfaces
 type PathUnion = string | {zip:string, fn: lambda.FunctionProps}
 type Dict<T> = {[key:string]:T}
-interface FunctionProps{
-    srcPaths: Dict<string>
-    bundledPaths:Dict<string>
-    zipPaths: Dict<string>
-}
 
 // #endregion interfaces
 
@@ -33,8 +28,12 @@ const printJSON = (d:any) => console.log(JSON.stringify(d, null, 2))
 export class Functions extends cdk.Construct {
   scope: cdk.Construct
   nodeId: string
-  props: FunctionProps
   distPath : string
+  props: {
+    srcPaths: Dict<string>
+    bundledPaths:Dict<string>
+    zipPaths: Dict<string>
+  }
 
   /**
    *
@@ -60,7 +59,6 @@ export class Functions extends cdk.Construct {
    * Add more Function Maps before running the Make Lambda method.
    * @param basePaths - [`srcBasePathsArr`, `zipBasePathsArr`]
    * @param srcs - Dict<src, zip>
-   * @returns
    */
   addMoreFuncs (basePaths:[string[], string[]], srcs:Dict<string[] | {src:string[], zip?:string[]}>) {
     const [srcBasePaths, zipBasePaths] = basePaths
@@ -95,7 +93,7 @@ export class Functions extends cdk.Construct {
     this.props.bundledPaths = Object.entries(this.props.srcPaths)
       .reduce((p, [name, src], i) => ({
         ...p,
-        [name]: resolve(join(this.distPath, name, name + '.js'))
+        [name]: resolve(join(this.distPath, name, 'index.js'))
       }), {})
 
     return Promise.all(
@@ -107,7 +105,7 @@ export class Functions extends cdk.Construct {
           target: 'node14',
           external: ['aws-sdk'],
           entryPoints: [srcPath],
-          outfile: join(dirname(this.props.bundledPaths[name]), `${name}.js`)
+          outfile: this.props.bundledPaths[name]
         })
       )
     )
@@ -134,6 +132,12 @@ export class Functions extends cdk.Construct {
     )
   }
 
+  /**
+   *
+   * @param applyFnConfig
+   * @param applyBuildOpts
+   * @param grantMap
+   */
   async makeLambdas (applyFnConfig: Dict<Partial<lambda.FunctionProps>> = {}, applyBuildOpts: BuildOptions = {}, grantMap: Dict<string> = {}) : Promise<Dict<lambda.Function>> {
     await this.esbuildBundleToDist(applyBuildOpts)
     await this.zipBundles()
@@ -144,11 +148,12 @@ export class Functions extends cdk.Construct {
       .reduce(async (p, [name, path]: [string, PathUnion]) => ({
         ...(await p),
         [name]: new lambda.Function(this.scope, name, {
-          ...applyFnConfig?.[name],
           functionName: name,
-          handler: `${name}.default`,
+          handler: 'index.handler',
           runtime: lambda.Runtime.NODEJS_14_X,
-          code: lambda.Code.fromAsset(typeof path === 'string' ? path : path.zip)
+          code: lambda.Code.fromAsset(typeof path === 'string' ? path : path.zip),
+          // overrite if given a valid fnConfig obj
+          ...applyFnConfig[name]
         })
       }), Promise.resolve({}) as Promise<Dict<lambda.Function>>)
   }
