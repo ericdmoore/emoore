@@ -62,7 +62,15 @@ export const isSigValid = (payload:IEmailCredentialInput, passWrdHash: string, s
     .digest('hex')
 }
 
-export const getResponder:Responder = async (event, ctx) => {
+const getLinksBasedOnInput = (e:Evt) => {
+  if (e.queryStringParameters?.paths) {
+    return async () => {}
+  } else {
+    return async () => {}
+  }
+}
+
+export const getResponder:Responder = async (data, event, ctx) => {
   return {
     statusCode: 200,
     isBase64Encoded: false,
@@ -77,10 +85,6 @@ export const getResponder:Responder = async (event, ctx) => {
  * @returns
  */
 export const getFetcher:IFunc = async (event, ctx) => {
-  const creds = pluckCredentialsFromEvent(event)
-  const passHash = await user.getViaEmail({ email: creds.email })
-  const isValidUser = isSigValid(creds, JSON.stringify(await passHash.Item), creds.signature)
-
   // email or user
   // maybe oobToken
 
@@ -90,13 +94,13 @@ export const getFetcher:IFunc = async (event, ctx) => {
     getResponder,
     dynResp,
     async (e, c, d) => {
-      // validate via DB
-      // email | userName, password, and token?
+      const creds = pluckCredentialsFromEvent(e)
+      const passHash = await user.getViaEmail(creds)
 
       return {
         code: 400,
         reason: 'This reason will never be triggered',
-        passed: true,
+        passed: isSigValid(creds, JSON.stringify(await passHash.Item), creds.signature),
         InvalidDataLoc: '',
         InvalidDataVal: '',
         docRef: ''
