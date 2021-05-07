@@ -10,7 +10,7 @@ import {
   // linkClickCountsByYear,
   // user,
   // userAccess
-} from '../../src/entities'
+} from '../../src/entities/entities'
 
 import { DynamoDB } from 'aws-sdk'
 // import type { Entity } from 'dynamodb-toolbox'

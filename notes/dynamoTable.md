@@ -49,6 +49,20 @@
 - `pk: #clickBucketMonth:{{LONG URL}}   || sk: {{ YYYY-MM-DD-HH }} -> [ clickBucket Record ] `
 - `pk: #clickBucketYear:{{LONG URL}}    || sk: {{ YYYY-MM-DD-HH }} -> [ clickBucket Record ] `
 
+
+## usserAccess
+
+- `pk: #clickBucketMinutes:{{LONG URL}} || sk: {{ YYYY-MM-DD-HH }} -> [ clickBucket Record ]`
+- `pk: #clickBucketHours:{{LONG URL}}   || sk: {{ YYYY-MM-DD-HH }} -> [ clickBucket Record ] `
+- `pk: #clickBucketDays:{{LONG URL}}    || sk: {{ YYYY-MM-DD-HH }} -> [ clickBucket Record ] `
+- `pk: #clickBucketMonth:{{LONG URL}}   || sk: {{ YYYY-MM-DD-HH }} -> [ clickBucket Record ] `
+- `pk: #clickBucketYear:{{LONG URL}}    || sk: {{ YYYY-MM-DD-HH }} -> [ clickBucket Record ] `
+
+
+
+
+
+
 ## Evolving Links
 
 - Links that change based on time, clicks, events, geo

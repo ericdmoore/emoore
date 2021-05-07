@@ -29,6 +29,8 @@ export class APIGateway extends cdk.Construct {
     scope: cdk.Construct
     nodeId: string
     httpApi: apigV2.HttpApi
+    authorizerFn: apigV2.HttpAuthorizer
+    // stage: apigV2.HttpStage
 
     /**
      *
@@ -46,6 +48,34 @@ export class APIGateway extends cdk.Construct {
         apiName: props.name,
         description: props.desc
       })
+
+      // this.authorizerFn = new apigV2.HttpAuthorizer(this.scope, 'HTTPAPI Authorizer', {
+      //   type: apigV2.HttpAuthorizerType.LAMBDA,
+      //   authorizerName: 'lambda-authorizer',
+      //   httpApi: this.httpApi,
+      //   identitySource: [
+      //     '$request.header.Authorization',
+      //     '$request.header.auth',
+      //     '$context.routeKey',
+      //     '$context.identity.sourceIp'
+      //   ]
+      // })
+
+      // this.authorizor = new apigV2.CfnAuthorizer(this.scope, 'HTTPAPI CFM Authorizer', {
+      //   name: 'lambda-authorizer',
+      //   apiId: this.httpApi.apiId,
+      //   authorizerType: apigV2.HttpAuthorizerType.LAMBDA,
+      //   identitySource: [
+      //     '$request.header.Authorization',
+      //     '$request.header.auth',
+      //     '$context.routeKey',
+      //     '$context.identity.sourceIp'
+      //   ],
+      //
+      //   authorizerResultTtlInSeconds: 60,
+      //   authorizerPayloadFormatVersion: '2.0'
+      //   authorizerUri: '',
+      // })
     }
 
     /**

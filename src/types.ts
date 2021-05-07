@@ -1,11 +1,39 @@
+import type {
+  // eslint-disable-next-line no-unused-vars
+  APIGatewayProxyHandlerV2 as Func,
+  // eslint-disable-next-line no-unused-vars
+  APIGatewayProxyEventV2 as Event,
+  APIGatewayEventRequestContext as Context,
+  // eslint-disable-next-line no-unused-vars
+  APIGatewayProxyResultV2 as Ret,
+  // eslint-disable-next-line no-unused-vars
+  APIGatewayProxyStructuredResultV2
+} from 'aws-lambda'
+
 import type { FilterExpressions } from 'dynamodb-toolbox/dist/lib/expressionBuilder'
 import type { ProjectionAttributes } from 'dynamodb-toolbox/dist/lib/projectionBuilder'
 import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import type { Table } from 'dynamodb-toolbox'
 
+export type Responder = <T>(Data:T, event: Event, context: Context)=> Promise<Ret>
 export type TableType<T> = T & { pk:string; sk:string }
 export type WithTimeStamp<T> = T & { cts:number; mts:number }
-
+export type Evt = Event
+export type Ctx = Context
+export type SRet = APIGatewayProxyStructuredResultV2
+export type IFuncRetValue = Promise<string | object | SRet| undefined>
+export type IFunc = (event: Event, context: Context & {nextToken?: string, dataPayload?:unknown}) => IFuncRetValue
+export interface RequestRejection{
+    reason: string
+    message: string
+    documentationRef: string
+}
+export type Rejector = (reasons:RequestRejection[]) => IFunc
+export type Validator = (nextIfPass:IFunc) => IFunc
+export interface JWTObject{
+    uacct: string
+    maxl25: string[]
+}
 export interface toolboxGetOptions {
     consistent?: boolean;
     capacity?: DocumentClient.ReturnConsumedCapacity;

@@ -80,7 +80,7 @@ export class Functions extends cdk.Construct {
             : ({ ...p, [ƒnName]: swapExt(resolve(...zipBasePaths, ...val.src)) }) // defaults back to src
       , this.props.zipPaths)
     }
-    return this.props
+    return this
   }
 
   /**

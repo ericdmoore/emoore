@@ -1,7 +1,7 @@
 /* globals test beforeAll  expect */
 
 import { DynamoDB } from 'aws-sdk'
-import { appTable, click } from '../../src/entities'
+import { appTable, click } from '../../src/entities/entities'
 import chunky from '../../src/utils/batchChunks'
 
 const msInDays = (n: number) => n * 24 * 3600_000

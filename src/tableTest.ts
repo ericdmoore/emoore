@@ -1,4 +1,4 @@
-import * as dynaEnt from './entities'
+import * as dynaEnt from './entities/entities'
 
 // import { DynamoDB, SharedIniFileCredentials } from 'aws-sdk'
 // const credentials = new SharedIniFileCredentials({ profile: 'default' })

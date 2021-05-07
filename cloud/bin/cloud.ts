@@ -24,13 +24,34 @@ interface APIconfigs{
   }
 }
 
+interface FnReadyForGateway{
+  src:string[],
+  path:string,
+  methods: apigV2.HttpMethod[],
+  fn:lambda.Function
+}
 // #endregion interfaces
 
 // func mamnifest
 const funcs = {
-  root: { src: ['root.ts'], path: '/', fn: null },
-  graphql: { src: ['graphql.ts'], path: '/graphql', fn: null }
+  // pattern
+  // funcID: {src: path: methods?: apigV2.HttpMethod[], authorizer?: apigV2.IHttpRouteAuthorizer}
+  //
+  // @todo - turn maybe the root turns into a directory listing of downstream paths
+  root: { path: '/', src: ['root.ts'], methods: [apigV2.HttpMethod.GET] },
+  graphql: { path: '/graphql', src: ['graphql.ts'], methods: [apigV2.HttpMethod.GET, apigV2.HttpMethod.POST] }
+  links: { path: '/links', src: ['links.ts'], methods: [apigV2.HttpMethod.ANY] },
+  users: { path: '/users', src: ['users.ts'], methods: [apigV2.HttpMethod.ANY] },
+  clicks: { path: '/clicks', src: ['clicks.ts'], methods: [apigV2.HttpMethod.ANY] }
 }
+
+/*
+
+links
+users
+clicks
+
+*/
 
 ;(async () => {
   const app = new cdk.App()
@@ -45,20 +66,19 @@ const funcs = {
   const zipBase = [__dirname, '../fnPkgs']
   const basePaths = [srcBase, zipBase] as [string[], string[]]
 
-  const cdkFunctions = new Functions(cdkStack, 'id', 'dist')
+  const funcMap = await new Functions(cdkStack, 'id', 'dist')
+    .addMoreFuncs(basePaths, funcs)
+    .makeLambdas({}, {
+      define: {
+        'process.env.AWS_KEY': `"${processenv.AWS_KEY}"`,
+        'process.env.AWS_SECRET': `"${processenv.AWS_SECRET}"`
+      }
+    })
 
-  cdkFunctions.addMoreFuncs(basePaths, funcs)
-
-  const funcMap = await cdkFunctions.makeLambdas({}, {
-    define: {
-      'process.env.AWS_KEY': `"${processenv.AWS_KEY}"`,
-      'process.env.AWS_SECRET': `"${processenv.AWS_SECRET}"`
-    }
-  })
   const fns = Object.entries(funcs).reduce((p, [fnID, val]) => ({
     ...p,
     [fnID]: { ...val, fn: funcMap[fnID] }
-  }), {} as {[fnID:string]:{src:string[], path:string, fn: lambda.Function}})
+  }), {} as {[fnID:string]:FnReadyForGateway})
 
   const api = new APIGateway(cdkStack, 'APIGateway', {
     name: 'emoore API Gateway',

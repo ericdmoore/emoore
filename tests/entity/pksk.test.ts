@@ -10,7 +10,7 @@ import {
   linkClickCountsByYear,
   user,
   userAccess
-} from '../../src/entities'
+} from '../../src/entities/entities'
 import dateFmt from '../../src/utils/dateFmt'
 
 type Dict<T> = {[key:string]:T}
@@ -131,26 +131,26 @@ test('Click - DynDB Inputs', async () => {
 })
 
 test('User - DynDB Inputs', async () => {
-  const uacct = 'ericdmoore'
-  const t = await user.ent.get({ uacct }, { execute: false }) as unknown as DynamoDBGetInputs
+  const email = 'ericdmoore'
+  const t = await user.ent.get({ email }, { execute: false }) as unknown as DynamoDBGetInputs
 
   expect(t).toHaveProperty('Key')
   expect(t).toHaveProperty('TableName')
   expect(t).toHaveProperty('Key.pk')
   expect(t).toHaveProperty('Key.sk')
-  expect(t.Key.pk).toBe(user.pk({ uacct }))
-  expect(t.Key.sk).toBe(user.sk({ uacct }))
+  expect(t.Key.pk).toBe(user.pk({ email }))
+  expect(t.Key.sk).toBe(user.sk({ email }))
 })
 
 test('UserAccess - DynDB Inputs', async () => {
-  const uacct = 'ericdmoore'
+  const email = 'ericdmoore'
   const short = 'ddg'
-  const t = await userAccess.ent.get({ short, uacct }, { execute: false }) as unknown as DynamoDBGetInputs
+  const t = await userAccess.ent.get({ short, email }, { execute: false }) as unknown as DynamoDBGetInputs
 
   expect(t).toHaveProperty('Key')
   expect(t).toHaveProperty('TableName')
   expect(t).toHaveProperty('Key.pk')
   expect(t).toHaveProperty('Key.sk')
-  expect(t.Key.pk).toBe(userAccess.pk({ uacct }))
+  expect(t.Key.pk).toBe(userAccess.pk({ email }))
   expect(t.Key.sk).toBe(userAccess.sk({ short }))
 })

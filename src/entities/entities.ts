@@ -1,21 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type * as k from './types'
+import type * as k from '../types'
 
 // eslint-disable-next-line no-unused-vars
 import { DynamoDB, Credentials, SharedIniFileCredentials } from 'aws-sdk'
 import { Table, Entity } from 'dynamodb-toolbox'
 import { EntityAttributes } from 'dynamodb-toolbox/dist/classes/Entity'
-import dateFmt from './utils/dateFmt'
+import dateFmt from '../utils/dateFmt'
 import ksuid from 'ksuid'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
-
-const credentials = new Credentials({
-  accessKeyId: process.env.AWS_KEY as string,
-  secretAccessKey: process.env.AWS_SECRET as string
-})
-// const credentials = new SharedIniFileCredentials({ profile: 'default' })
-
-const DocClient = new DynamoDB.DocumentClient({ credentials, region: 'us-west-2' })
 
 // #region interfaces
 type Dict<T> = {[key:string]:T}
@@ -75,23 +67,6 @@ export interface ClickBucketByPut{
   by?: IBucketTimeResolutions
 }
 
-// #endregion interfaces
-
-export const epoch = () => Date.now() //  epoch time in ms
-
-export const appTable = new Table({
-  name: 'emooreAppTable',
-  partitionKey: 'pk',
-  sortKey: 'sk',
-  DocumentClient: DocClient
-})
-
-export const customTimeStamps = (i: EntityAttributes): EntityAttributes => ({
-  ...i,
-  cts: { type: 'number', default: epoch, onUpdate: false },
-  mts: { type: 'number', default: epoch, onUpdate: true }
-})
-
 export interface LinkKind {
   short: string
   long :string
@@ -100,10 +75,53 @@ export interface LinkKind {
   authZKey: string
 }
 
+export interface UserKind {
+  short: string
+  long :string
+  og: {[ogPrefix:string]:string}
+  ownerID: string
+  authZKey: string
+}
+
+// #endregion interfaces
+
+export const epoch = () => Date.now() //  epoch time in ms
+
+const credentials = process.env.AWS_KEY
+  ? new Credentials({
+    accessKeyId: process.env.AWS_KEY as string,
+    secretAccessKey: process.env.AWS_SECRET as string
+  })
+  : new SharedIniFileCredentials({
+    profile: 'default'
+  })
+
+const DocClient = new DynamoDB.DocumentClient({ credentials, region: 'us-west-2' })
+
+export const appTable = new Table({
+  name: 'emooreAppTable',
+  partitionKey: 'pk',
+  sortKey: 'sk',
+  DocumentClient: DocClient
+  // indexes: {
+  //   userByEmail: {
+  //     partitionKey: 'u#',
+  //     sortKey: 'u#'
+  //   }
+  // }
+})
+
+export const customTimeStamps = (i: EntityAttributes): EntityAttributes => ({
+  ...i,
+  cts: { type: 'number', default: epoch, onUpdate: false },
+  mts: { type: 'number', default: epoch, onUpdate: true }
+})
+
 export const link = {
   pk: (data:{short:string}) => `l#${data.short}`,
   sk: (data:{short:string}) => `l#${data.short}`,
   get: (i:{short:string}) => link.ent.get(i) as Promise<DocumentClient.GetItemOutput>,
+  getBatch: async (i: {shorts: string[]}) => appTable.batchGet(i.shorts.map(short => link.ent.getBatch({ short }))) as Promise<DocumentClient.BatchGetItemOutput>,
   ent: new Entity({
     table: appTable,
     name: 'link',
@@ -121,26 +139,18 @@ export const link = {
   })
 }
 
-export interface UserKind {
-  short: string
-  long :string
-  og: {[ogPrefix:string]:string}
-  ownerID: string
-  authZKey: string
-}
-
 export const user = {
-  pk: (data:{uacct:string}) => `u#${data.uacct}`,
-  sk: (data:{uacct:string}) => `u#${data.uacct}`,
-  get: (i:{uacct:string}) => link.ent.get(i) as Promise<DocumentClient.GetItemOutput>,
+  pk: (input:{email:string}) => `u#${decodeURI(input.email)}`,
+  sk: (input:{email:string}) => `u#${decodeURI(input.email)}`,
+  getViaEmail: (input:{email:string}) => user.ent.get(user.pk(input)) as Promise<DocumentClient.GetItemOutput>,
   ent: new Entity({
     table: appTable,
     name: 'user',
     timestamps: false,
     attributes: customTimeStamps({
-      uacct: { type: 'string' },
-      //
       displayName: { type: 'string' },
+      email: { type: 'string' },
+      //
       pk: { hidden: true, partitionKey: true, dependsOn: 'uacct', default: (data:any) => `u#${data.uacct}` },
       sk: { hidden: true, sortKey: true, dependsOn: 'uacct', default: (data:any) => `u#${data.uacct}` }
     })
@@ -148,10 +158,11 @@ export const user = {
 }
 
 export const userAccess = {
-  pk: (i:{uacct: string}) => `u#${i.uacct}`,
-  sk: (i:{short: string}) => `ac#${i.short}`,
-  getBatch: (i:{uacct: string, short:string[] }) => i.short.map(s => appTable.batchGet(userAccess.ent.getBatch({ uacct: i.uacct, short: s }))) as unknown as Promise<DocumentClient.BatchGetItemOutput>,
-  queryRange: (i:{uacct: string, startLink:string, endLink: string }) => appTable.query(
+  pk: (i:{email: string}) => `u#${decodeURI(i.email)}`,
+  sk: (i:{short: string}) => `ac#${decodeURI(i.short)}`,
+  getBatch: async (i:{email: string, shorts:string[] }) => appTable.batchGet(i.shorts.map(short => userAccess.ent.getBatch({ uacct: i.email, short }))) as Promise<DocumentClient.BatchGetItemOutput>,
+  query: (i:{email: string }) => appTable.query(userAccess.pk(i), { beginsWith: 'ac#' }) as Promise<DocumentClient.QueryOutput>,
+  queryRange: (i:{email: string, startLink:string, endLink: string }) => appTable.query(
     userAccess.pk(i), {
       between: [
         userAccess.sk({ short: i.startLink }),

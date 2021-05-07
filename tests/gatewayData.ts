@@ -1,3 +1,8 @@
+import type {
+  APIGatewayProxyEventV2 as Event,
+  APIGatewayEventRequestContext as Context
+} from 'aws-lambda'
+
 export const ctx = {
   callbackWaitsForEmptyEventLoop: false,
   functionName: 'string',
@@ -8,11 +13,11 @@ export const ctx = {
   logGroupName: 'string',
   logStreamName: 'string',
   getRemainingTimeInMillis: () => 1000,
-  /** next set @deprecated-  Use handler callback or promise result */
+  /** next set is @deprecated-  Use handler callback or promise result */
   done: (error?: Error, result?: any) => { if (error) throw error },
   fail: (error: Error | string) => { if (error) throw error },
   succeed: (messageOrObject: any) => {}
-}
+} as unknown as Context
 
 export const event = {
   version: 'v2',
@@ -39,4 +44,4 @@ export const event = {
     time: 'string',
     timeEpoch: Date.now()
   }
-}
+} as Event
