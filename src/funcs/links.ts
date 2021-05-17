@@ -1,4 +1,4 @@
-import type { IFunc, Repsonder, SRet, Evt, Ctx } from '../types'
+import type { IFunc, Responder, SRet, Evt, Ctx } from '../types'
 import { link, userAccess } from '../entities/entities'
 import baseHandle from './common'
 import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
@@ -37,7 +37,7 @@ const getLinksBasedOnInput = (e:Evt) => {
   }
 }
 
-export const getResponder: Repsonder = async (dataPayload:unknown, event:Evt, ctx:Ctx) => {
+export const getResponder: Responder = async (dataPayload:unknown, event:Evt, ctx:Ctx) => {
   const data = dataPayload as ListOfLinks | undefined
   const kind = data?.kind as 'query' | 'batch' | undefined
 

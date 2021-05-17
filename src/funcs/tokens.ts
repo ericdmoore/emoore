@@ -13,8 +13,8 @@ import { user } from '../entities/entities'
 // import { getJWTobject } from '../auths/validJWT'
 // import JSON5 from 'json5'
 import validate from './validations'
-// import { HttpStatusCode } from '../enums/HTTPstatusCodes'
 
+// import { HttpStatusCode } from '../enums/HTTPstatusCodes'
 // #region interfaces
 
 export interface IEmailCredentialInput{
@@ -28,6 +28,13 @@ export interface IEmailCredentialInput{
 
 // pluickers
 
+/**
+ * ## Pluck Data For KeyString
+ *
+ * `Headers > QueryString > Cookies`
+ * @param key
+ * @returns
+ */
 const pluckDataFor = (key:string) => (e:Evt): string | undefined => {
   return e.headers?.[key] ??
   e.queryStringParameters?.[key] ??
@@ -56,13 +63,15 @@ export const pluckCredentialsFromEvent = (e:Evt): IEmailCredentialInput => {
   }
 }
 
-export const isSigValid = (payload:IEmailCredentialInput, passWrdHash: string, signature: string):boolean => {
-  return signature === createHmac('sha256', passWrdHash)
-    .update(JSON.stringify(payload, Object.keys(payload).sort()))
+export const calcSignature = async (dataPayload: string, secret:string) => {}
+
+export const isSigValid = (creds:IEmailCredentialInput, passWrdHash: string):boolean => {
+  return creds.signature === createHmac('sha256', passWrdHash)
+    .update(JSON.stringify(creds, Object.keys(creds).sort()))
     .digest('hex')
 }
 
-const getLinksBasedOnInput = (e:Evt) => {
+const getTokensForUserBasedOnEvent = (e:Evt) => {
   if (e.queryStringParameters?.paths) {
     return async () => {}
   } else {
@@ -70,7 +79,7 @@ const getLinksBasedOnInput = (e:Evt) => {
   }
 }
 
-export const getResponder:Responder = async (data, event, ctx) => {
+export const getResponder:Responder = async (event, ctx, data) => {
   return {
     statusCode: 200,
     isBase64Encoded: false,
@@ -88,7 +97,7 @@ export const getFetcher:IFunc = async (event, ctx) => {
   // email or user
   // maybe oobToken
 
-  const dynResp = await getLinksBasedOnInput(event)()
+  const dynResp = await getTokensForUserBasedOnEvent(event)()
 
   return validate(
     getResponder,
@@ -100,7 +109,7 @@ export const getFetcher:IFunc = async (event, ctx) => {
       return {
         code: 400,
         reason: 'This reason will never be triggered',
-        passed: isSigValid(creds, JSON.stringify(await passHash.Item), creds.signature),
+        passed: isSigValid(creds, JSON.stringify(await passHash.Item?.passwordHash)),
         InvalidDataLoc: '',
         InvalidDataVal: '',
         docRef: ''

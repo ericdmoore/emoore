@@ -22,11 +22,13 @@
     "@graphql-eslint/eslint-plugin": "^0.9.1",
     "@graphql-tools/schema": "^7.1.3",
     "@types/aws-lambda": "^8.10.75",
+    "@types/bcrypt": "^5.0.0",
     "@types/dotenv": "^8.2.0",
     "@types/jest": "^26.0.22",
     "@types/jsonwebtoken": "^8.5.1",
     "@types/local-dynamo": "^0.5.0",
     "@types/node": "^14.14.41",
+    "@types/qrcode": "^1.4.0",
     "@typescript-eslint/eslint-plugin": "^4.22.0",
     "@typescript-eslint/parser": "^4.22.0",
     "apollo-server": "^2.22.2",
@@ -61,6 +63,7 @@
     "@graphql-inspector/config": "^2.3.0",
     "@types/merge-deep": "^3.0.0",
     "aws-sdk": "^2.882.0",
+    "bcrypt": "^5.0.1",
     "dotenv": "^8.2.0",
     "dynamodb-toolbox": "^0.3.3",
     "fp-ts": "^2.9.3",
@@ -69,6 +72,9 @@
     "io-ts": "^2.2.13",
     "jsonwebtoken": "^8.5.1",
     "ksuid": "^2.0.0",
-    "memfs": "^3.2.0"
+    "memfs": "^3.2.0",
+    "nanoid": "^3.1.23",
+    "otplib": "^12.0.1",
+    "qrcode": "^1.4.4"
   }
 }
