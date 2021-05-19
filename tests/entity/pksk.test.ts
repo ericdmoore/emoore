@@ -10,7 +10,7 @@ import {
   linkClickCountsByYear,
   user,
   userAccess
-} from '../../src/entities/entities'
+} from '../../src/entities'
 import dateFmt from '../../src/utils/dateFmt'
 
 type Dict<T> = {[key:string]:T}

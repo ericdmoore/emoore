@@ -4,7 +4,9 @@ import { Entity } from 'dynamodb-toolbox'
 import bcrypt from 'bcrypt'
 import { nanoid } from 'nanoid'
 import { authenticator } from 'otplib'
-import qrcode from 'qrcode'
+
+// import qrcode from 'qrcode'
+// can add this if browser side it too difficult
 
 interface oobToken {
    strategy: 'TOTP' | 'U2F'
@@ -13,9 +15,9 @@ interface oobToken {
 }
 
 export const user = {
-  pk: (i:{email:string}) => `u#${decodeURI(i.email)}`,
-  sk: (i:{email:string}) => `u#${decodeURI(i.email)}`,
-  getViaEmail: (i:{email:string}) => user.ent.get(user.pk(i)),
+  pk: (i:{email:string}) => `u#${decodeURIComponent(i.email)}`,
+  sk: (i:{email:string}) => `u#${decodeURIComponent(i.email)}`,
+  getViaEmail: async (i:{email:string}) => (await user.ent.get({ email: i.email })).Item,
   password: {
     /**
      * @param passwordPlainText - plain text password
@@ -29,10 +31,17 @@ export const user = {
       * @param i.passwordPlanText
       * @readsDB
     */
-    isValidForUser: async (i:{email:string, passwordPlanText: string}) =>
-      bcrypt.compare(i.passwordPlanText, (await user.getViaEmail(i)).pwHash)
+    isValidForUser: async (i:{email:string, passwordPlainText: string}) =>
+      bcrypt.compare(i.passwordPlainText, (await user.getViaEmail(i)).pwHash)
   },
   otp: {
+    isValidOTP: async (email: string, code: string) => {
+      const [validBackupCode, validTOTP] = await Promise.all([
+        user.otp.isValidBackUpCode(email, code),
+        user.otp.isValidTOTP(email, code)
+      ])
+      return validBackupCode || validTOTP
+    },
     /**
      * @param email
      * @param code
@@ -40,7 +49,7 @@ export const user = {
      * @note userland: if valid, please remove the used code
      */
     isValidBackUpCode: async (email: string, code: string) => {
-      const u = await user.ent.get(user.pk({ email }))
+      const u = await user.getViaEmail({ email })
       return (u.backupCodes as string[]).includes(code)
     },
     /**
@@ -48,8 +57,8 @@ export const user = {
      * @param TOTPcode
      * @readsDB
      */
-    isValidCode: async (email: string, TOTPcode: string) => {
-      const u = await user.ent.get(user.pk({ email }))
+    isValidTOTP: async (email: string, TOTPcode: string) => {
+      const u = await user.getViaEmail({ email })
       return (u.oobTokens as oobToken[])
         .reduce((p, oob) => p && authenticator.check(TOTPcode, oob.secret), true)
     },
@@ -58,8 +67,8 @@ export const user = {
      * @note userland: please save these to a user
      * @pure
      */
-    genBackups: async (backUpCodeLen: number = 8) => {
-      return Array(backUpCodeLen).fill(0).map(nanoid)
+    genBackups: async (backUpCodeLen: number = 8, codeLen = 12) => {
+      return Array(backUpCodeLen).fill(0).map(v => nanoid(codeLen))
     },
     /**
      * @param email
@@ -70,13 +79,15 @@ export const user = {
     gen2FA: async (email:string, strategy = 'TOTP') => {
       const { secret } = await user.otp.createTOTPOption()
       const uri = authenticator.keyuri(email, 'emoo.re', secret)
-      return { strategy, uri, secret, qr: await qrcode.toDataURL(uri) }
+      return { strategy, uri, secret }
     },
     /**
-     *
      * @pure
      */
-    createTOTPOption: async () => ({ strategy: 'TOTP', secret: authenticator.generateSecret() })
+    createTOTPOption: async () => ({
+      strategy: 'TOTP',
+      secret: authenticator.generateSecret()
+    })
   },
   ent: new Entity({
     table: appTable,
@@ -84,11 +95,10 @@ export const user = {
     timestamps: false,
     attributes: customTimeStamps({
       displayName: { type: 'string' },
-      oobTokens: { type: 'list' }, //
+      oobTokens: { type: 'list' },
       backupCodes: { type: 'set', setType: 'string' },
       email: { type: 'string' },
       pwHash: { type: 'string' },
-      //
       pk: { hidden: true, partitionKey: true, dependsOn: 'email', default: (data:any) => user.pk(data) },
       sk: { hidden: true, sortKey: true, dependsOn: 'email', default: (data:any) => user.sk(data) }
     })
