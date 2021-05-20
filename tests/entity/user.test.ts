@@ -29,6 +29,7 @@ type UserList = User[]
 
 // #endregion interfaces
 
+// #region pure-tests
 test('User - DynDB Inputs', async () => {
   const uacct = 'ericdmoore'
   const t = await user.ent.get({ uacct }, { execute: false }) as unknown as DynamoDBGetInputs
@@ -49,10 +50,9 @@ test('User - OTP create TOTP Option', async () => {
   expect(t.strategy).toBe('TOTP')
 })
 
-test('User - gen 2FA', async () => {
+test('User - gen 2FA.TOTP', async () => {
   const uacct = 'ericdmoore'
   const t = await user.otp.gen2FA(uacct)
-  // console.log(t)
   //
   // start with it removed
   // removed for storage reasons
@@ -61,6 +61,37 @@ test('User - gen 2FA', async () => {
   expect(t).toHaveProperty('strategy')
   expect(t).toHaveProperty('uri')
   expect(t.strategy).toBe('TOTP')
+})
+
+test('User - gen 2FA.U2F', async () => {
+  const uacct = 'ericdmoore'
+  const t = await user.otp.gen2FA(uacct, 'U2F')
+  //
+  // start with it removed
+  // removed for storage reasons
+  // expect(t).toHaveProperty('qr')
+  expect(t).toHaveProperty('secret')
+  expect(t).toHaveProperty('strategy')
+  expect(t).toHaveProperty('uri')
+  expect(t.strategy).toBe('U2F')
+})
+
+test('User - gen 2FA.SMS', async () => {
+  const uacct = 'ericdmoore'
+  const t = await user.otp.gen2FA(uacct, 'SMS')
+  //
+  // start with it removed
+  // removed for storage reasons
+  // expect(t).toHaveProperty('qr')
+  expect(t).toHaveProperty('secret')
+  expect(t).toHaveProperty('strategy')
+  expect(t).toHaveProperty('uri')
+  expect(t.strategy).toBe('SMS')
+})
+
+test('User - Mint User ID', async () => {
+  const uacct = await user.mintUserID()
+  expect(uacct).toHaveLength(24)
 })
 
 test('User - gen backups', async () => {
@@ -81,33 +112,63 @@ test('User - password Hash', async () => {
   const c = await bcrypt.compare(plain, hash)
   expect(c).toBe(true)
 })
+// #endregion pure-tests
 
 describe('Using a Test Harness', () => {
   const userList = [
     {
-      uacct: 'user.user@exmaple.com',
+      uacct: 'LJJW2SCONZTEEQ32JZAU64KC',
       displayName: 'Yoo Sir',
       passwordPlainText: 'myPassword1',
       backupCodes: [] as string[],
       oobTokens: [] as oobToken[]
     },
     {
-      uacct: 'user.tim@exmaple.com',
+      uacct: 'CK46UAZJ23QEETZNOCS2WJJL',
       displayName: 'Timothy',
       passwordPlainText: 'myPassword2',
       backupCodes: [] as string[],
       oobTokens: [] as oobToken[]
     }
   ]
-  const updateUserWithOTP = async (idx:number, userList: UserList) => {
+
+  interface IDRefs{
+    uacct: string
+    typeID: 'email'| 'phone'
+    exID: string
+  }
+
+  const userIDs = [
+    {
+      uacct: 'LJJW2SCONZTEEQ32JZAU64KC',
+      typeID: 'email' as 'email'| 'phone',
+      exID: 'user.user@example.com'
+    },
+    {
+      uacct: 'CK46UAZJ23QEETZNOCS2WJJL',
+      typeID: 'email' as 'email'| 'phone',
+      exID: 'user.tim.test@example.com'
+    }
+  ]
+
+  const updateUserWith2FA = async (idx:number, userList: UserList) => {
     userList[idx].backupCodes = await user.otp.genBackups(8, 12)
     userList[idx].oobTokens = [await user.otp.gen2FA(userList[idx].uacct)]
   }
+
+  const updateUserWithExternalID = async (idx:number, idList: IDRefs[]) => {
+    const { uacct, typeID, exID } = idList[idx]
+    await user.addExternalID(uacct, typeID, exID)
+    return { uacct, typeID, exID }
+  }
+
   beforeAll(async () => {
     // edit userList
     await Promise.all([
-      updateUserWithOTP(0, userList),
-      updateUserWithOTP(1, userList)
+      updateUserWith2FA(0, userList),
+      updateUserWith2FA(1, userList),
+      updateUserWithExternalID(0, userIDs),
+      updateUserWithExternalID(1, userIDs)
     ])
 
     // write it
@@ -140,6 +201,18 @@ describe('Using a Test Harness', () => {
     expect(u).toHaveProperty('oobTokens')
     expect(u).toHaveProperty('pwHash')
     expect(u).toHaveProperty('uacct')
+  })
+
+  test('User - Mint User ID', async () => {
+    const uacct = await user.mintUserID('LJJW2SCONZTEEQ32JZAU64KC')
+    console.log({ uacct })
+    expect(uacct).toHaveLength(24)
+  })
+
+  test('Is Password Valid for User', async () => {
+    const { typeID, exID } = userIDs[0]
+    const u = await user.lookupVia({ typeID, exID })
+    expect(u).toBeTruthy()
   })
 
   test('Is Password Valid for User', async () => {

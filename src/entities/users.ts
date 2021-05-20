@@ -40,20 +40,34 @@ const createRandomBytes = (bytes:number):Promise<Buffer> => new Promise((resolve
 export const user = {
   pk: (i:{uacct:string}) => `u#${decodeURIComponent(i.uacct)}`,
   sk: (i:{uacct:string}) => `u#${decodeURIComponent(i.uacct)}`,
-  mintUserID: async () => {
-    const attempt = base32.encode(nanoid(15))
-    if (await user.getByID(attempt)) {
-      console.log(1)
+  mintUserID: async (attemptUacct?:string): Promise<string> => {
+    const tryUacct = attemptUacct ?? base32.encode(nanoid(15))
+    const u = await user.getByID(tryUacct)
+    if (u) {
+      // collision found so re-attempt
+      return user.mintUserID()
     } else {
-      console.log(2)
+      return tryUacct
     }
   },
   lookupVia: async (i:{typeID:'phone'|'email', exID:string}) => {
-    const { uacct } = (await userLookup.ent.get(i)).Item
+    const { uacct } = (
+      await userLookup.ent.get(i).catch(er => { throw new Error(er) })
+    ).Item
     return user.getByID(uacct)
   },
+  addExternalID: async (uacct:string, typeID:'email'| 'phone', exID:string) => {
+    const opts = { uacct, exID, typeID, isIDVerified: false }
+    await userLookup.ent.put(opts)
+    return opts
+  },
   getByID: async (uacct:string):Promise<IUser> =>
-    user.ent.get({ uacct }).then(d => d.Item),
+    user.ent.get({ uacct })
+      .then(d => d.Item)
+      .catch(er => {
+        /* istanbul ignore next */
+        throw new Error(er)
+      }),
   password: {
     /**
      * @param passwordPlainText - plain text password
@@ -71,10 +85,10 @@ export const user = {
       bcrypt.compare(i.passwordPlainText, (await user.getByID(i.uacct)).pwHash)
   },
   otp: {
-    isValidOTP: async (email: string, code: string) => {
+    isValidOTP: async (uacct: string, code: string) => {
       const [validBackupCode, validTOTP] = await Promise.all([
-        user.otp.isValidBackUpCode(email, code),
-        user.otp.isValidTOTP(email, code)
+        user.otp.isValidBackUpCode(uacct, code),
+        user.otp.isValidTOTP(uacct, code)
       ])
       return validBackupCode || validTOTP
     },
@@ -127,6 +141,7 @@ export const user = {
         const uri = 'read more docs to see if can be used for server challenge'
         return { strategy, uri, secret, label }
       } else {
+        /* istanbul ignore next */
         throw new Error('Invalid strategy type')
       }
     },
