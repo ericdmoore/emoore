@@ -4,20 +4,56 @@ import { Entity } from 'dynamodb-toolbox'
 import bcrypt from 'bcrypt'
 import { nanoid } from 'nanoid'
 import { authenticator } from 'otplib'
+import * as base32 from 'hi-base32'
+import { randomBytes } from 'crypto'
+import { userLookup } from './userLookup'
 
 // import qrcode from 'qrcode'
 // can add this if browser side it too difficult
 
-interface oobToken {
-   strategy: 'TOTP' | 'U2F'
+interface TwoFAStringSec {
+   strategy: 'TOTP' | 'SMS'
    secret: string
    acctName: string
+   label?:string
+}
+interface TwoFABufferSec {
+  strategy: 'U2F'
+  secret: Buffer
+  acctName: string
+  label?:string
+}
+type ITwoFactorOpt = TwoFAStringSec | TwoFABufferSec
+
+interface IUser{
+  uacct:string
+  pwHash:string
+  displayName:string
+  oobTokens: ITwoFactorOpt[]
+  backupCodes: string[]
 }
 
+const createRandomBytes = (bytes:number):Promise<Buffer> => new Promise((resolve, reject) => {
+  randomBytes(bytes, (er, d) => er ? reject(er) : resolve(d))
+})
+
 export const user = {
-  pk: (i:{email:string}) => `u#${decodeURIComponent(i.email)}`,
-  sk: (i:{email:string}) => `u#${decodeURIComponent(i.email)}`,
-  getViaEmail: async (i:{email:string}) => (await user.ent.get({ email: i.email })).Item,
+  pk: (i:{uacct:string}) => `u#${decodeURIComponent(i.uacct)}`,
+  sk: (i:{uacct:string}) => `u#${decodeURIComponent(i.uacct)}`,
+  mintUserID: async () => {
+    const attempt = base32.encode(nanoid(15))
+    if (await user.getByID(attempt)) {
+      console.log(1)
+    } else {
+      console.log(2)
+    }
+  },
+  lookupVia: async (i:{typeID:'phone'|'email', exID:string}) => {
+    const { uacct } = (await userLookup.ent.get(i)).Item
+    return user.getByID(uacct)
+  },
+  getByID: async (uacct:string):Promise<IUser> =>
+    user.ent.get({ uacct }).then(d => d.Item),
   password: {
     /**
      * @param passwordPlainText - plain text password
@@ -31,8 +67,8 @@ export const user = {
       * @param i.passwordPlanText
       * @readsDB
     */
-    isValidForUser: async (i:{email:string, passwordPlainText: string}) =>
-      bcrypt.compare(i.passwordPlainText, (await user.getViaEmail(i)).pwHash)
+    isValidForUser: async (i:{uacct:string, passwordPlainText: string}) =>
+      bcrypt.compare(i.passwordPlainText, (await user.getByID(i.uacct)).pwHash)
   },
   otp: {
     isValidOTP: async (email: string, code: string) => {
@@ -48,8 +84,8 @@ export const user = {
      * @readsDB
      * @note userland: if valid, please remove the used code
      */
-    isValidBackUpCode: async (email: string, code: string) => {
-      const u = await user.getViaEmail({ email })
+    isValidBackUpCode: async (uacct: string, code: string) => {
+      const u = await user.getByID(uacct)
       return (u.backupCodes as string[]).includes(code)
     },
     /**
@@ -57,10 +93,10 @@ export const user = {
      * @param TOTPcode
      * @readsDB
      */
-    isValidTOTP: async (email: string, TOTPcode: string) => {
-      const u = await user.getViaEmail({ email })
-      return (u.oobTokens as oobToken[])
-        .reduce((p, oob) => p && authenticator.check(TOTPcode, oob.secret), true)
+    isValidTOTP: async (uacct: string, TOTPcode: string) => {
+      const u = await user.getByID(uacct)
+      return (u.oobTokens as ITwoFactorOpt[])
+        .reduce((p, oob) => p || authenticator.check(TOTPcode, oob.secret.toString()), false)
     },
     /**
      * @param backUpCodeLen
@@ -76,10 +112,23 @@ export const user = {
      * @note Please Save the secret,
      * @pure
      */
-    gen2FA: async (email:string, strategy = 'TOTP') => {
-      const { secret } = await user.otp.createTOTPOption()
-      const uri = authenticator.keyuri(email, 'emoo.re', secret)
-      return { strategy, uri, secret }
+    gen2FA: async (uacct:string, strategy :'TOTP' | 'SMS' | 'U2F' = 'TOTP', label?: string) => {
+      if (strategy === 'TOTP') {
+        const { secret } = await user.otp.createTOTPOption()
+        const uri = authenticator.keyuri(uacct, 'emoo.re', secret)
+        return { strategy, uri, secret, label }
+      } else if (strategy === 'SMS') {
+        const secret = base32.encode(nanoid(5)).slice(0, 6)
+        const jwt = `somejwt.including.${uacct}`
+        const uri = `https://login.emoo.re?authToken=${jwt}`
+        return { strategy, uri, secret, label }
+      } else if (strategy === 'U2F') {
+        const secret = await createRandomBytes(32)
+        const uri = 'read more docs to see if can be used for server challenge'
+        return { strategy, uri, secret, label }
+      } else {
+        throw new Error('Invalid strategy type')
+      }
     },
     /**
      * @pure
@@ -97,7 +146,7 @@ export const user = {
       displayName: { type: 'string' },
       oobTokens: { type: 'list' },
       backupCodes: { type: 'set', setType: 'string' },
-      email: { type: 'string' },
+      uacct: { type: 'string' },
       pwHash: { type: 'string' },
       pk: { hidden: true, partitionKey: true, dependsOn: 'email', default: (data:any) => user.pk(data) },
       sk: { hidden: true, sortKey: true, dependsOn: 'email', default: (data:any) => user.sk(data) }

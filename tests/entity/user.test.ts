@@ -4,30 +4,41 @@ import { appTable } from '../../src/entities/entities'
 import { authenticator } from 'otplib'
 import bcrypt from 'bcrypt'
 
+// #region interfaces
+
 type Dict<T> = {[key:string]:T}
 interface DynamoDBGetInputs{
     TableName: string
     Key: Dict<string>
 }
+
+interface oobToken{
+  strategy:string
+  uri:string
+  secret:string | Buffer
+  label?:string
+}
 interface User{
-    email: string
+    uacct: string
     displayName: string
     passwordPlainText: string
     backupCodes: string[]
-    oobTokens: {strategy:string, secret:string}[]
+    oobTokens: oobToken[]
 }
 type UserList = User[]
 
+// #endregion interfaces
+
 test('User - DynDB Inputs', async () => {
-  const email = 'ericdmoore'
-  const t = await user.ent.get({ email }, { execute: false }) as unknown as DynamoDBGetInputs
+  const uacct = 'ericdmoore'
+  const t = await user.ent.get({ uacct }, { execute: false }) as unknown as DynamoDBGetInputs
 
   expect(t).toHaveProperty('Key')
   expect(t).toHaveProperty('TableName')
   expect(t).toHaveProperty('Key.pk')
   expect(t).toHaveProperty('Key.sk')
-  expect(t.Key.pk).toBe(user.pk({ email }))
-  expect(t.Key.sk).toBe(user.sk({ email }))
+  expect(t.Key.pk).toBe(user.pk({ uacct }))
+  expect(t.Key.sk).toBe(user.sk({ uacct }))
 })
 
 test('User - OTP create TOTP Option', async () => {
@@ -39,8 +50,8 @@ test('User - OTP create TOTP Option', async () => {
 })
 
 test('User - gen 2FA', async () => {
-  const email = 'ericdmoore'
-  const t = await user.otp.gen2FA(email)
+  const uacct = 'ericdmoore'
+  const t = await user.otp.gen2FA(uacct)
   // console.log(t)
   //
   // start with it removed
@@ -74,23 +85,23 @@ test('User - password Hash', async () => {
 describe('Using a Test Harness', () => {
   const userList = [
     {
-      email: 'user.user@exmaple.com',
+      uacct: 'user.user@exmaple.com',
       displayName: 'Yoo Sir',
       passwordPlainText: 'myPassword1',
       backupCodes: [] as string[],
-      oobTokens: [] as {strategy:string, secret:string}[]
+      oobTokens: [] as oobToken[]
     },
     {
-      email: 'user.tim@exmaple.com',
+      uacct: 'user.tim@exmaple.com',
       displayName: 'Timothy',
       passwordPlainText: 'myPassword2',
       backupCodes: [] as string[],
-      oobTokens: [] as {strategy:string, secret:string}[]
+      oobTokens: [] as oobToken[]
     }
   ]
   const updateUserWithOTP = async (idx:number, userList: UserList) => {
     userList[idx].backupCodes = await user.otp.genBackups(8, 12)
-    userList[idx].oobTokens = [await user.otp.gen2FA(userList[idx].email)]
+    userList[idx].oobTokens = [await user.otp.gen2FA(userList[idx].uacct)]
   }
   beforeAll(async () => {
     // edit userList
@@ -121,75 +132,77 @@ describe('Using a Test Harness', () => {
   })
 
   test('Get via Email', async () => {
-    const { email } = userList[0]
-    const u = await user.getViaEmail({ email })
+    const { uacct } = userList[0]
+    const u = await user.getByID(uacct)
 
-    expect(u).toHaveProperty('email')
+    expect(u).toHaveProperty('backupCodes')
     expect(u).toHaveProperty('displayName')
+    expect(u).toHaveProperty('oobTokens')
     expect(u).toHaveProperty('pwHash')
+    expect(u).toHaveProperty('uacct')
   })
 
   test('Is Password Valid for User', async () => {
-    const { email, passwordPlainText } = userList[0]
+    const { uacct, passwordPlainText } = userList[0]
     const isValid = await user.password.isValidForUser({
-      email,
+      uacct,
       passwordPlainText
     })
     expect(isValid).toBe(true)
   })
 
   test('Is Password inValid for User', async () => {
-    const { email } = userList[0]
+    const { uacct } = userList[0]
     const isValid = await user.password.isValidForUser({
-      email,
+      uacct,
       passwordPlainText: 'BAD Password'
     })
     expect(isValid).toBe(false)
   })
 
   test('User has valid TOTP', async () => {
-    const { email } = userList[0]
+    const { uacct } = userList[0]
     const secret = userList[0].oobTokens[0].secret
-    const newTOTP = authenticator.generate(secret)
+    const newTOTP = authenticator.generate(secret as string)
     const isValid = await user.otp.isValidTOTP(
-      email,
+      uacct,
       newTOTP
     )
     expect(isValid).toBe(true)
   })
 
   test('User has invalid TOTP', async () => {
-    const { email } = userList[0]
+    const { uacct } = userList[0]
     const isValid = await user.otp.isValidTOTP(
-      email,
+      uacct,
       authenticator.generate('ABCDEADBEEF'))
     expect(isValid).toBe(false)
   })
 
   test('User has valid BackUp Code', async () => {
-    const { email } = userList[0]
+    const { uacct } = userList[0]
     const backupCode = userList[0].backupCodes[0]
     const isValid = await user.otp.isValidBackUpCode(
-      email,
+      uacct,
       backupCode
     )
     expect(isValid).toBe(true)
   })
 
   test('User has invalid BackUp Code', async () => {
-    const { email } = userList[0]
+    const { uacct } = userList[0]
     const isValid = await user.otp.isValidBackUpCode(
-      email,
+      uacct,
       'ABCDEADBEEF'
     )
     expect(isValid).toBe(false)
   })
 
   test('User has valid OTP', async () => {
-    const { email } = userList[0]
+    const { uacct } = userList[0]
     const backupCode = userList[0].backupCodes[0]
     const isValid = await user.otp.isValidOTP(
-      email,
+      uacct,
       backupCode
     )
     expect(isValid).toBe(true)
