@@ -143,13 +143,13 @@ export const user = {
     name: 'user',
     timestamps: false,
     attributes: customTimeStamps({
+      uacct: { type: 'string' },
       displayName: { type: 'string' },
       oobTokens: { type: 'list' },
       backupCodes: { type: 'set', setType: 'string' },
-      uacct: { type: 'string' },
       pwHash: { type: 'string' },
-      pk: { hidden: true, partitionKey: true, dependsOn: 'email', default: (data:any) => user.pk(data) },
-      sk: { hidden: true, sortKey: true, dependsOn: 'email', default: (data:any) => user.sk(data) }
+      pk: { hidden: true, partitionKey: true, dependsOn: 'uacct', default: (data:any) => user.pk(data) },
+      sk: { hidden: true, sortKey: true, dependsOn: 'uacct', default: (data:any) => user.sk(data) }
     })
   })
 }
