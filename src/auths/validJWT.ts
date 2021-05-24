@@ -13,6 +13,7 @@ import type {
 import type { JWTObject } from '../types'
 import jwt from 'jsonwebtoken'
 import HTTPStatusCodes from '../enums/HTTPstatusCodes'
+import { tryHead } from '../utils/first'
 
 // #region interfaces
 export type IFuncRetValue = Promise<string | object | SRet| undefined>
@@ -26,8 +27,6 @@ export type Rejector = (reasons:RequestRejection[]) => IFunc
 export type Validator = (nextIfPass:IFunc) => IFunc
 
 // #endregion interfaces
-
-export const tryHead = (s:string[]) => s.length > 0 ? s[0] : undefined
 export const JWT_SECRET = process.env.JWT_SECRET as string
 export const JWT_SECRET_ID = process.env.JWT_SECRET_ID as string
 
@@ -36,7 +35,7 @@ export const pluckJWTfromEvent = (event:Event) =>
   event.headers?.token ??
   event.queryStringParameters?.Token ??
   event.queryStringParameters?.token ??
-  tryHead(jwtCookies(event.cookies))
+  tryHead(jwtCookies(event.cookies), undefined)
 
 const jwtCookies = (cookieArr:string[] = []) => cookieArr.filter(c => c.startsWith('Token=') || c.startsWith('token='))
 
@@ -63,13 +62,15 @@ export const getJWTobject = async (e:Event): Promise<unknown> => {
   return jwtVerify(JWT_SECRET)(token)
 }
 
-export const jwtVerify = (secretOrPublicKey: jwt.Secret | jwt.GetPublicKeyOrSecret = JWT_SECRET) => (token: string, opts?: jwt.VerifyOptions):Promise<JWTObject> =>
+export const jwtVerify = (secretOrPublicKey: jwt.Secret | jwt.GetPublicKeyOrSecret = JWT_SECRET) => (token: string | undefined, opts?: jwt.VerifyOptions):Promise<JWTObject> =>
   new Promise((resolve, reject) => {
-    jwt.verify(token, secretOrPublicKey, opts, (er, obj) => {
-      if (er) { reject(er) } else {
-        resolve(obj as JWTObject)
-      }
-    })
+    if (!token) {
+      reject(new Error('missing token for verification'))
+    } else {
+      jwt.verify(token, secretOrPublicKey, opts, (er, obj) =>
+        er ? reject(er) : resolve(obj as JWTObject)
+      )
+    }
   })
 
 export const jwtSign = (secretOrPrivateKey: jwt.Secret = JWT_SECRET) => (payload: JWTObject, opts: jwt.SignOptions = { keyid: JWT_SECRET_ID }): Promise<string> =>

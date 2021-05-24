@@ -25,12 +25,13 @@ interface TwoFABufferSec {
 }
 type ITwoFactorOpt = TwoFAStringSec | TwoFABufferSec
 
-interface IUser{
+export interface IUser{
   uacct:string
   pwHash:string
   displayName:string
   oobTokens: ITwoFactorOpt[]
   backupCodes: string[]
+  maxl25:string[]
 }
 
 const createRandomBytes = (bytes:number):Promise<Buffer> => new Promise((resolve, reject) => {

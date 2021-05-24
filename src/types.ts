@@ -15,14 +15,14 @@ import type { ProjectionAttributes } from 'dynamodb-toolbox/dist/lib/projectionB
 import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import type { Table } from 'dynamodb-toolbox'
 
-export type Responder = <T>(Data:T, event: Event, context: Context)=> Promise<Ret>
+export type Responder<T> = (Data:T, event: Event, context: Context)=> Promise<Ret>
 export type TableType<T> = T & { pk:string; sk:string }
 export type WithTimeStamp<T> = T & { cts:number; mts:number }
 export type Evt = Event
 export type Ctx = Context
 export type SRet = APIGatewayProxyStructuredResultV2
-export type IFuncRetValue = Promise<string | object | SRet| undefined>
-export type IFunc = (event: Event, context: Context & {nextToken?: string, dataPayload?:unknown}) => IFuncRetValue
+export type IFuncRetValueP = Promise<string | object | SRet| undefined>
+export type IFunc = (event: Event, context: Context & {nextToken?: string, dataPayload?:unknown}) => IFuncRetValueP
 export interface RequestRejection{
     reason: string
     message: string
@@ -31,8 +31,9 @@ export interface RequestRejection{
 export type Rejector = (reasons:RequestRejection[]) => IFunc
 export type Validator = (nextIfPass:IFunc) => IFunc
 export interface JWTObject{
-    uacct: string
-    maxl25: string[]
+    email: string
+    uacct?: string
+    maxl25?: string[]
 }
 export interface toolboxGetOptions {
     consistent?: boolean;

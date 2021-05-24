@@ -6,11 +6,11 @@ import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
 // import type { LinkKind } from './entities'
 
 export const userAccess = {
-  pk: (i:{email: string}) => `u#${decodeURI(i.email)}`,
+  pk: (i:{uacct: string}) => `u#${decodeURI(i.uacct)}`,
   sk: (i:{short: string}) => `ac#${decodeURI(i.short)}`,
-  getBatch: async (i:{email: string, shorts:string[] }) => appTable.batchGet(i.shorts.map(short => userAccess.ent.getBatch({ uacct: i.email, short }))) as Promise<DocumentClient.BatchGetItemOutput>,
-  query: (i:{email: string }) => appTable.query(userAccess.pk(i), { beginsWith: 'ac#' }) as Promise<DocumentClient.QueryOutput>,
-  queryRange: (i:{email: string, startLink:string, endLink: string }) => appTable.query(
+  getBatch: async (i:{uacct: string, shorts:string[] }) => appTable.batchGet(i.shorts.map(short => userAccess.ent.getBatch({ uacct: i.uacct, short }))) as Promise<DocumentClient.BatchGetItemOutput>,
+  query: (i:{uacct: string }) => appTable.query(userAccess.pk(i), { beginsWith: 'ac#' }) as Promise<DocumentClient.QueryOutput>,
+  queryRange: (i:{uacct: string, startLink:string, endLink: string }) => appTable.query(
     userAccess.pk(i), {
       between: [
         userAccess.sk({ short: i.startLink }),

@@ -1,5 +1,5 @@
 import type { IFunc, Responder, SRet, Evt, Ctx } from '../types'
-import { link, userAccess } from '../entities/entities'
+import { link, userAccess } from '../entities'
 import baseHandle from './common'
 import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
 // import { getJWTobject } from '../auths/validJWT'
@@ -25,14 +25,14 @@ const getLinksBasedOnInput = (e:Evt) => {
       // get the uacct
       return {
         kind: 'query' as 'query',
-        data: await userAccess.query({ email: '' })
+        data: await userAccess.query({ uacct: '' })
       }
     }
   } else {
     // batchget items
     return async () => ({
       kind: 'batch' as 'batch',
-      data: await link.getBatch({ shorts: list })
+      data: await link.getBatch(list)
     })
   }
 }

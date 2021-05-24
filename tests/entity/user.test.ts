@@ -205,7 +205,7 @@ describe('Using a Test Harness', () => {
 
   test('User - Mint User ID', async () => {
     const uacct = await user.mintUserID('LJJW2SCONZTEEQ32JZAU64KC')
-    console.log({ uacct })
+    // console.log({ uacct })
     expect(uacct).toHaveLength(24)
   })
 

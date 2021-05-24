@@ -7,7 +7,24 @@ import type { ClickPut, iClickEventRangeQuery } from './entities'
 export const click = {
   pk: (i:{short:string}) => `c#${i.short}`,
   sk: (i:{ts:number}) => `tks#${ksuid.randomSync(i.ts).string}`,
-  queryRange: async (i:iClickEventRangeQuery) => appTable.query(click.pk({ short: i.short }), { between: [click.sk({ ts: i.tsLo }), click.sk({ ts: i.tsHi })] }) as Promise<DocumentClient.QueryOutput>,
+  createClick: (i:{
+    short:string,
+    long:string,
+    ip?:string,
+    geo?:{},
+    localTime?: number,
+    tzOffSet?:number,
+    useragent?:{},
+    cts?: number
+    }) => ({ cts: Date.now(), ...i }),
+  queryRange: async (i:iClickEventRangeQuery) =>
+    appTable.query(
+      click.pk({ short: i.short }),
+      {
+        between: [
+          click.sk({ ts: i.tsLo }),
+          click.sk({ ts: i.tsHi })]
+      }) as Promise<DocumentClient.QueryOutput>,
   ent: new Entity({
     table: appTable,
     name: 'click',

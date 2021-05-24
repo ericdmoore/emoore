@@ -1,5 +1,5 @@
 import { HttpStatusCode } from '../enums/HTTPstatusCodes'
-import type { IFunc, SRet, Evt, Ctx, IFuncRetValue } from '../types'
+import type { IFunc, SRet, Evt, Ctx, IFuncRetValueP } from '../types'
 
 interface ValidationResp{
   code: number
@@ -9,20 +9,20 @@ interface ValidationResp{
   InvalidDataVal?: string
   docRef?: string
 }
-type ValidationTests<T> = (event:Evt, context: Ctx, comparisonData: T) => Promise<ValidationResp>
+export type ValidationTest<T> = (event:Evt, context: Ctx, authZData: T) => Promise<ValidationResp>
 
-export const validate = <T>(responder: (compData:T, e:Evt, c:Ctx)=>IFuncRetValue, comparisonData: T, ...tests:ValidationTests<T>[]) : IFunc => async (event, context) => {
-  const failures = (await Promise.all(tests.map(t => t(event, context, comparisonData))))
+export const validate = <T>(responder: (authZData:T, e:Evt, c:Ctx)=>IFuncRetValueP, authZData: T, ...tests:ValidationTest<T>[]) : IFunc => async (event, context) => {
+  const errors = (await Promise.all(tests.map(t => t(event, context, authZData))))
     .filter(t => !t.passed)
     .map(t => { const { passed, ...data } = t; return data })
 
-  if (failures.length) {
+  if (errors.length) {
     return {
       statusCode: HttpStatusCode.BAD_REQUEST,
-      body: JSON.stringify({ failures })
+      body: JSON.stringify({ errors })
     } as SRet
   } else {
-    return responder(comparisonData, event, context)
+    return responder(authZData, event, context)
   }
 }
 

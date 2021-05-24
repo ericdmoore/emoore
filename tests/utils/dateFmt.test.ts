@@ -1,7 +1,7 @@
 /* globals test expect */
 import dateFmt from '../../src/utils/dateFmt'
 
-console.log('tz Offset(s): ', (new Date()).getTimezoneOffset())
+// console.log('tz Offset(s): ', (new Date()).getTimezoneOffset())
 
 test('YYYY', () => {
   const t1 = 1618586020152

@@ -2,14 +2,26 @@
 import type * as k from '../types'
 import { appTable, customTimeStamps } from './entities'
 import { Entity } from 'dynamodb-toolbox'
-import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
+// import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import type { LinkKind } from './entities'
+
+interface ILink{
+  short: string
+  long: string
+  og?: {}
+  ownerID?: string
+  authzKey?: string
+}
 
 export const link = {
   pk: (data:{short:string}) => `l#${data.short}`,
   sk: (data:{short:string}) => `l#${data.short}`,
-  get: (i:{short:string}) => link.ent.get(i) as Promise<DocumentClient.GetItemOutput>,
-  getBatch: async (i: {shorts: string[]}) => appTable.batchGet(i.shorts.map(short => link.ent.getBatch({ short }))) as Promise<DocumentClient.BatchGetItemOutput>,
+  get: (i:{short:string}) => link.ent.get(i).then(d => d.Item),
+  getBatch: async (shorts: string[]):Promise<ILink[]> => {
+    const arr = await appTable.batchGet(shorts.map(short => link.ent.getBatch({ short })))
+      .then(d => Object.values(d.Responses)) as ILink[][]
+    return arr.flat(1)
+  },
   ent: new Entity({
     table: appTable,
     name: 'link',

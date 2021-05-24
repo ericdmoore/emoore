@@ -1,35 +1,47 @@
 /* globals describe test expect beforeEach afterEach beforeAll afterAll */
 
 import handler from '../../src/funcs/tokens'
-import user from '../../src/entities/users'
+import { user, appTable } from '../../src/entities'
 import { event, ctx } from '../gatewayData'
 
 const users = [
   {
-    email: 'user1@example.com',
+    uacct: 'tokens.user1@example.com',
     displayName: 'Yoo Sir',
-    pwHash: user.cretePasswordHash('A not so very Bad password for Yoo')
+    plaintextPassword: 'A not so very Bad password for Yoo'
   },
   {
-    email: 'TimEst@example.com',
+    uacct: 'tokens.TimEst@example.com',
     displayName: 'T Est',
-    pwHash: user.cretePasswordHash('A not so very Bad password for Tim')
+    plaintextPassword: 'A not so very Bad password for Tim'
   },
   {
-    email: 'mdma@example.com',
+    uacct: 'tokens.mdma@example.com',
     displayName: 'Molly',
-    pwHash: user.cretePasswordHash('A not so very Bad password for Molly')
+    plaintextPassword: 'A not so very Bad password for Molly'
   }
 ]
+
 beforeAll(async () => {
   // load table data
-  user.ent.putBatch(users.map(u => user.ent.putBatch(u)))
+  await appTable.batchWrite(
+    await Promise.all(
+      users.map(async u => {
+        const { plaintextPassword, ...usr } = u
+        return user.ent.putBatch({
+          ...usr,
+          pwHash: await user.password.toHash(plaintextPassword)
+        })
+      })
+    ))// end user batch
 })
 
 afterAll(async () => {
   // remove table data
   // so as to not interfere with other test-suites
-  user.ent.deleteBatch(users.map(u => user.ent.deleteBatch(u)))
+  await appTable.batchWrite(
+    users.map(u => user.ent.deleteBatch(u))
+  )
 })
 
 /*
@@ -54,16 +66,17 @@ Overview
 // })
 
 describe('POST /tokens', () => {
-  beforeEach(async () => {})
-  afterEach(async () => {})
-  test('Make a starter token for YOOSir - the starter + OOB gives you a valid token', async () => {
-    const e = event
-    e.requestContext.http.method = 'GET'
-    e.requestContext.http.protocol = 'https'
-    e.requestContext.http.path = '/tokens'
+  // beforeEach(async () => {})
+  // afterEach(async () => {})
 
-    e.headers.token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjE2MTk3MjI1NjkifQ.eyJ1YWNjdCI6ImVyaWNkbW9vcmUiLCJpYXQiOjE2MjAwNzYzMzksImV4cCI6MTYyMDE2MjczOSwiaXNzIjoiY28uZmVkZXJhIn0.P_9Nxom_sWOKejaVZWN_X_R0TnApfGFJve4xAmmxZI4'
-    const resp = await handler(e, ctx)
+  const tokenPathEvt = event()
+  tokenPathEvt.requestContext.http.method = 'GET'
+  tokenPathEvt.requestContext.http.protocol = 'https'
+  tokenPathEvt.requestContext.http.path = '/tokens'
+
+  test('Make a starter token for YOOSir - the starter + OOB gives you a valid token', async () => {
+    tokenPathEvt.headers.token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjE2MTk3MjI1NjkifQ.eyJ1YWNjdCI6ImVyaWNkbW9vcmUiLCJpYXQiOjE2MjAwNzYzMzksImV4cCI6MTYyMDE2MjczOSwiaXNzIjoiY28uZmVkZXJhIn0.P_9Nxom_sWOKejaVZWN_X_R0TnApfGFJve4xAmmxZI4'
+    const resp = await handler(tokenPathEvt, ctx)
     console.log({ resp })
     expect(resp).toEqual({})
   })
