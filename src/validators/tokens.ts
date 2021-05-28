@@ -1,26 +1,26 @@
 import type { Evt } from '../types'
 import type { ValidationTest } from '../funcs/validations'
-import { user } from '../entities'
+import { user, IUser } from '../entities'
 import { createHmac } from 'crypto'
 import { btoa } from '../utils/base64'
 import { pluckDataFor } from '../utils/pluckData'
 import first from '../utils/first'
+import { jwtVerify } from '../auths/validJWT'
 
 // #region interfaces
-export interface ILoginInfoInput{
-    email: string | null
-    TFAtype?: string
-    TFAchallengeResp?: string
-    sig: string | null
-}
+import type { ILoginInfoInput } from '../funcs/tokens'
 
-interface authZ {
-    creds: ILoginInfoInput
-}
+// type ReqdAuthZ = FullObject<authZ>
+// type PartAuthZ = {
+//   creds: Partial<ILoginInfoInput>
+//   jwtUser: Partial<IUser>
+// }
+type AuthZFlatPartial = Partial<ILoginInfoInput & IUser>
+
 // #endregion interfaces
 
 // #region helpers
-const pluckAuthTokenFromEvent = (e:Evt) => first(
+export const pluckAuthTokenFromEvent = (e:Evt) => first(
   [
     pluckDataFor('AuthorizationToken'),
     pluckDataFor('authorizationToken'),
@@ -31,39 +31,67 @@ const pluckAuthTokenFromEvent = (e:Evt) => first(
   ].map(f => f(e, undefined))
 )
 
+/**
+*
+* @param e
+*/
+export const pluckCredentialsFromEvent = (e:Evt): ILoginInfoInput => {
+  const p = pluckDataFor('p')(e, null)
+  return {
+    email: pluckDataFor('email')(e, null),
+    p: p === null ? null : btoa(p),
+    TFAtype: pluckDataFor('TFAtype')(e, undefined),
+    TFAchallengeResp: pluckDataFor('TFAchallengeResp')(e, undefined)
+  }
+}
+
 export const makeSig = (creds:ILoginInfoInput, password: string):string => {
   return createHmac('sha256', password)
     .update(JSON.stringify(creds, Object.keys(creds).sort()))
     .digest('hex')
 }
 
-export const isSigValid = (creds:ILoginInfoInput, base64password: string):boolean => {
-  return creds.sig === null || creds.email == null
-    ? false
-    : creds.sig === makeSig(creds, btoa(base64password))
-}
-
 // #endregion helpers
 
 // #region validators
-export const emailNotProvided: ValidationTest<authZ> = async (e, c, d) => {
-  const creds = d.creds
+export const emailNotProvided: ValidationTest<AuthZFlatPartial> = async (e, c, d) => {
   return {
     code: 400,
     reason: 'Email Not Provided',
-    passed: creds.email !== null,
+    passed: !!d.email,
     InvalidDataLoc: '',
     InvalidDataVal: '',
     docRef: ''
   }
 }
 
-export const emailAddressInvalid: ValidationTest<authZ> = async (e, c, d) => {
-  const creds = d.creds
+export const passIsProvidedAndValid: ValidationTest<AuthZFlatPartial> = async (e, c, d) => {
+  if (d.p && d.email) {
+    const u = await user.lookupVia({ typeID: 'email', exID: d.email })
+    return {
+      code: 400,
+      reason: 'Password is Invalid For the Given Email',
+      passed: await user.password.isValidForUser({ uacct: u.uacct, passwordPlainText: d.p }),
+      InvalidDataLoc: '[H > Q > C].p',
+      InvalidDataVal: 'Will Not show Password In PlainText',
+      docRef: '##'
+    }
+  } else {
+    return {
+      code: 400,
+      reason: 'Password is Not Provided',
+      passed: false,
+      InvalidDataLoc: '[H > Q > C].p',
+      InvalidDataVal: 'Will Not show Password In PlainText',
+      docRef: '##'
+    }
+  }
+}
 
-  const u = await user.lookupVia({ typeID: 'email', exID: creds.email as string })
+export const emailAddressInvalid: ValidationTest<AuthZFlatPartial> = async (e, c, d) => {
+  const exID = d?.email ?? '' as string
+  const u = await user.lookupVia({ typeID: 'email', exID })
     .catch(er => { return null })
-  console.log({ u })
 
   return {
     code: 400,
@@ -75,38 +103,7 @@ export const emailAddressInvalid: ValidationTest<authZ> = async (e, c, d) => {
   }
 }
 
-export const sigNotProvided: ValidationTest<authZ> = async (e, c, d) => {
-  const creds = d.creds
-  return {
-    code: 400,
-    reason: 'Signature Not Provided',
-    passed: creds.sig !== null,
-    InvalidDataLoc: '',
-    InvalidDataVal: '',
-    docRef: ''
-  }
-}
-
-export const sigInvalid: ValidationTest<authZ> = async (e, c, d) => {
-  const creds = d.creds
-
-  const u = await user.lookupVia({ typeID: 'email', exID: creds.email as string })
-    .catch(er => { return null })
-
-  return {
-    code: 400,
-    reason: 'Invalid Signature',
-    passed: !u ? false : isSigValid(creds, u.pwHash),
-    InvalidDataLoc: '',
-    InvalidDataVal: '',
-    docRef: `To Make a signature 
-      str = JSON.stringify({email, TFAtoken, TFAtype}),
-      and then make an HMAC string using the 'sha-256' alogorithm and where the secret value = base64(password)
-      `
-  }
-}
-
-export const authTokenNotProvided: ValidationTest<authZ> = async (e, c, d) => {
+export const authTokenNotProvided: ValidationTest<AuthZFlatPartial> = async (e, c, d) => {
   const authToken = pluckAuthTokenFromEvent(e)
   return {
     code: 400,
@@ -131,24 +128,79 @@ export const authTokenNotProvided: ValidationTest<authZ> = async (e, c, d) => {
   }
 }
 
-export const authTokenInvalid: ValidationTest<authZ> = async (e, c, d) => {
-  const creds = d.creds
-
-  const u = await user.lookupVia({
-    typeID: 'email',
-    exID: creds.email as string
-  }).catch(er => { return null })
+export const authTokenInvalid: ValidationTest<AuthZFlatPartial> = async (e, c, d) => {
+  const token = pluckAuthTokenFromEvent(e)
+  const obj = await jwtVerify()(token).catch(er => null)
 
   return {
     code: 400,
-    reason: 'Invalid Signature',
-    passed: !u ? false : isSigValid(creds, u.pwHash),
-    InvalidDataLoc: '',
-    InvalidDataVal: '',
-    docRef: `To Make a signature 
-      str = JSON.stringify({email, TFAtoken, TFAtype}),
-      and then make an HMAC string using the 'sha-256' alogorithm and where the secret value = base64(password)
-      `
+    reason: 'Invalid Authorization Token',
+    passed: !!obj,
+    InvalidDataLoc: '[H>Q>C].authToken',
+    InvalidDataVal: token,
+    docRef: ''
+  }
+}
+
+export const authTokenContainsValidUacct: ValidationTest<AuthZFlatPartial> = async (e, c, d) => {
+  const token = pluckAuthTokenFromEvent(e)
+  const tokenData = await jwtVerify()(token).catch(er => null)
+
+  return {
+    code: 400,
+    reason: 'Cannot find a valid Uacct from the token',
+    passed: !!tokenData?.uacct,
+    InvalidDataLoc: '[H>Q>C].authToken',
+    InvalidDataVal: JSON.stringify(tokenData),
+    docRef: ''
+  }
+}
+
+export const isTOTPChallengeValid: ValidationTest<AuthZFlatPartial> = async (e, c, d) => {
+  if (d?.email) {
+    user.lookupVia({ typeID: 'email', exID: d?.email })
+    // abort not a validation needing to run
+    // so just pass it based on non-applicable precondition
+    return true
+  } else {
+    const challengeResp = d.TFAchallengeResp
+    const TFAtype = d.TFAtype
+
+    if (d.uacct) {
+      if (TFAtype === 'TOTP') {
+        return {
+          code: 400,
+          reason: 'Invalid TFA TOTP Challenge Response',
+          passed: !!challengeResp && await user.otp.isValidOTP(d.uacct, challengeResp),
+          InvalidDataLoc: 'H > Q > C',
+          InvalidDataVal: challengeResp
+        }
+      } else if (TFAtype === 'U2F') {
+        return {
+          code: 400,
+          reason: 'Invalid TFA Challenge - U2F is not yet implemented',
+          passed: false,
+          InvalidDataLoc: 'H > Q > C',
+          InvalidDataVal: challengeResp
+        }
+      } else {
+        return {
+          code: 400,
+          reason: 'Invalid TFA Type',
+          passed: false,
+          InvalidDataLoc: 'H > Q > C',
+          InvalidDataVal: d.TFAtype
+        }
+      }
+    } else {
+      return {
+        code: 400,
+        reason: 'Cannot Find Valid User Account',
+        passed: false,
+        InvalidDataLoc: 'H > Q > C',
+        InvalidDataVal: d.TFAtype
+      }
+    }
   }
 }
 

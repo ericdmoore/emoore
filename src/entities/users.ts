@@ -1,15 +1,18 @@
 // import type * as k from '../types'
-import { appTable, customTimeStamps } from './entities'
+import { randomBytes } from 'crypto'
 import { Entity } from 'dynamodb-toolbox'
 import bcrypt from 'bcrypt'
 import { nanoid } from 'nanoid'
 import { authenticator } from 'otplib'
 import * as base32 from 'hi-base32'
-import { randomBytes } from 'crypto'
+import { appTable, customTimeStamps } from './entities'
 import { userLookup } from './userLookup'
 
+// import { Fido2Lib } from 'fido2-library'
 // import qrcode from 'qrcode'
 // can add this if browser side it too difficult
+
+// const h = require('fido2-helpers')
 
 interface TwoFAStringSec {
    strategy: 'TOTP' | 'SMS'
@@ -38,9 +41,19 @@ const createRandomBytes = (bytes:number):Promise<Buffer> => new Promise((resolve
   randomBytes(bytes, (er, d) => er ? reject(er) : resolve(d))
 })
 
+// const oneOf = async (...tests: (()=>Promise<boolean>)[]) => tests.reduce(
+// async (p, c) => await p || await c(), Promise.resolve(false))
+//
+// const f2l = new Fido2Lib({ timeout: 60 })
+
 export const user = {
   pk: (i:{uacct:string}) => `u#${decodeURIComponent(i.uacct)}`,
   sk: (i:{uacct:string}) => `u#${decodeURIComponent(i.uacct)}`,
+
+  /**
+   * @param attemptUacct
+   * @readsDB to verify no collision
+   */
   mintUserID: async (attemptUacct?:string): Promise<string> => {
     const tryUacct = attemptUacct ?? base32.encode(nanoid(15))
     const u = await user.getByID(tryUacct)
@@ -51,17 +64,35 @@ export const user = {
       return tryUacct
     }
   },
+  /**
+   *
+   * @param i
+   * @readsDB 2x
+   */
   lookupVia: async (i:{typeID:'phone'|'email', exID:string}) => {
-    const { uacct } = (
-      await userLookup.ent.get(i).catch(er => { throw new Error(er) })
-    ).Item
-    return user.getByID(uacct)
+    const { uacct } = (await userLookup.ent.get(i).catch(er => { throw new Error(er) })).Item
+
+    if (uacct) {
+      return user.getByID(uacct)
+    } else {
+      throw new Error(`User Account ID was Invalid: ${{ uacct }}`)
+    }
   },
+  /**
+   * @param uacct - User Account
+   * @param typeID - ENUM email or phone
+   * @param exID - external ID
+   * @writesDB
+   */
   addExternalID: async (uacct:string, typeID:'email'| 'phone', exID:string) => {
     const opts = { uacct, exID, typeID, isIDVerified: false }
     await userLookup.ent.put(opts)
     return opts
   },
+  /**
+   * @param uacct user account
+   * @readsDB
+   */
   getByID: async (uacct:string):Promise<IUser> =>
     user.ent.get({ uacct })
       .then(d => d.Item)
@@ -102,6 +133,43 @@ export const user = {
     isValidBackUpCode: async (uacct: string, code: string) => {
       const u = await user.getByID(uacct)
       return (u.backupCodes as string[]).includes(code)
+    },
+    /**
+     *
+     */
+    isValidU2F: async (uacct: string, challengeResp: string):Promise<boolean> => {
+      //
+      // @see : https://slides.com/fidoalliance/jan-2018-fido-seminar-webauthn-tutorial
+      //
+      // const u = await user.getByID(uacct)
+      // const U2Fseeds = u.oobTokens.filter(v => v.strategy === 'U2F')
+      //
+      // const expected = {
+      //   rpId: '',
+      //   challenge: '',
+      //   origin: 'https://localhost:8443',
+      //   factor: 'either' as 'either',
+      //   publicKey: h.lib.assnPublicKey,
+      //   prevCounter: 362,
+      //   userHandle: null
+      // }
+      // f2l.assertionResult(
+      //   {
+      //     // id?: ArrayBuffer;
+      //     // rawId?: ArrayBuffer;
+      //     response: {
+      //       clientDataJSON: 'string',
+      //       authenticatorData: Buffer.from(''),
+      //       signature: 'string'
+      //       // userHandle?: 'string'
+      //     }
+      //   }, expected
+      // )
+      //   .then(d => d.audit.validRequest)
+      //   .catch(er => false)
+
+      // not yet implemented
+      return false
     },
     /**
      * @param email

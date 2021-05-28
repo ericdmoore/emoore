@@ -62,16 +62,17 @@ export const getJWTobject = async (e:Event): Promise<unknown> => {
   return jwtVerify(JWT_SECRET)(token)
 }
 
-export const jwtVerify = (secretOrPublicKey: jwt.Secret | jwt.GetPublicKeyOrSecret = JWT_SECRET) => (token: string | undefined, opts?: jwt.VerifyOptions):Promise<JWTObject> =>
-  new Promise((resolve, reject) => {
-    if (!token) {
-      reject(new Error('missing token for verification'))
-    } else {
-      jwt.verify(token, secretOrPublicKey, opts, (er, obj) =>
-        er ? reject(er) : resolve(obj as JWTObject)
-      )
-    }
-  })
+export const jwtVerify = (secretOrPublicKey: jwt.Secret | jwt.GetPublicKeyOrSecret = JWT_SECRET) =>
+  (token: string | undefined, opts?: jwt.VerifyOptions) : Promise<JWTObject> =>
+    new Promise((resolve, reject) => {
+      if (!token) {
+        reject(new Error('missing token for verification'))
+      } else {
+        jwt.verify(token, secretOrPublicKey, opts, (er, obj) =>
+          er ? reject(er) : resolve(obj as JWTObject)
+        )
+      }
+    })
 
 export const jwtSign = (secretOrPrivateKey: jwt.Secret = JWT_SECRET) => (payload: JWTObject, opts: jwt.SignOptions = { keyid: JWT_SECRET_ID }): Promise<string> =>
   new Promise((resolve, reject) => {

@@ -15,7 +15,7 @@ import type { ProjectionAttributes } from 'dynamodb-toolbox/dist/lib/projectionB
 import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import type { Table } from 'dynamodb-toolbox'
 
-export type Responder<T> = (Data:T, event: Event, context: Context)=> Promise<Ret>
+export type Responder<T> = (responderAuthzData:T, event: Event, context: Context)=> Promise<Ret>
 export type TableType<T> = T & { pk:string; sk:string }
 export type WithTimeStamp<T> = T & { cts:number; mts:number }
 export type Evt = Event
@@ -32,8 +32,8 @@ export type Rejector = (reasons:RequestRejection[]) => IFunc
 export type Validator = (nextIfPass:IFunc) => IFunc
 export interface JWTObject{
     email: string
+    maxl25: string[]
     uacct?: string
-    maxl25?: string[]
 }
 export interface toolboxGetOptions {
     consistent?: boolean;
@@ -65,6 +65,26 @@ export interface toolboxPutOptions {
     execute?: boolean;
     parse?: boolean;
 }
+
+export type plainTypes = string | number | boolean | BigInt | Function | ((...args:any[])=>any) | symbol | undefined | null
+export type NonNullObj<T> = {[P in keyof T]: NonNullable<T[P]>}
+export type FullObject<T> = Required<NonNullObj<T>>
+
+export type RecursivePartial<T> = {
+    [P in keyof T]?:
+      T[P] extends (infer U)[] ? RecursivePartial<U>[] :
+      T[P] extends object ? RecursivePartial<T[P]> : T[P];
+}
+
+type _RecursiveReqd<T> = {
+    [P in keyof T]:
+      T[P] extends (infer U)[]
+        ? _RecursiveReqd<Required<U>>[]
+        : T[P] extends object
+            ? _RecursiveReqd<Required<T[P]>>
+            : T[P];
+}
+export type RecursiveRequired<T> = _RecursiveReqd<Required<T>>
 
 export declare type ToolboxSchemaType = string | number | boolean | null | {
     [key: string]: ToolboxSchemaType;

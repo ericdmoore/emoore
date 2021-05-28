@@ -1,167 +1,168 @@
-import type { IFunc, SRet, Evt, Responder } from '../types'
+import type { IFunc, SRet, Responder, JWTObject, NonNullObj } from '../types'
 import type { IUser } from '../entities/users'
-// import { createHmac } from 'crypto'
-// import { btoa } from '../utils/base64'
-import baseHandle from './common'
-import validate from './validations'
-import first from '../utils/first'
-import pluckDataFor from '../utils/pluckData'
+import type { ValidationResp } from './validations'
+
 import { user } from '../entities'
 import { jwtSign, jwtVerify } from '../auths/validJWT'
-
+import baseHandle from './common'
+import validate from './validations'
 import {
+  pluckCredentialsFromEvent,
+  pluckAuthTokenFromEvent,
   emailAddressInvalid,
   emailNotProvided,
-  sigNotProvided,
-  sigInvalid,
+  passIsProvidedAndValid,
   authTokenInvalid,
-  authTokenNotProvided
+  authTokenNotProvided,
+  isTOTPChallengeValid
 } from '../validators/tokens'
-
-// import { user } from '../entities'
-// import { getJWTobject } from '../auths/validJWT'
-// import JSON5 from 'json5'
-// import { HttpStatusCode } from '../enums/HTTPstatusCodes'
 
 // #region interfaces
 
 export interface ILoginInfoInput{
     email: string | null
+    p: string | null
     TFAtype?: 'TOTP' | 'U2F' | string
     TFAchallengeResp?: string
-    sig: string | null
 }
 
-export interface authZData{
+export interface IAuthzData{
   creds: ILoginInfoInput
-  jwtUser: IUser & {email: string}
-  tokenStr: string
+  jwtUser?: IUser
 }
+
+export type IAuthzFlat = ILoginInfoInput & IUser
+export type IAuthzFlatPartial = Partial<IAuthzFlat>
+export type IAuthzFlatRequired = Required<NonNullObj<IAuthzFlat>>
 
 // #endregion interfaces
 
 // pluickers
 
-// eslint-disable-next-line no-unused-vars
-const pluckAuthTokenFromEvent = (e:Evt) => first(
-  [
-    pluckDataFor('AuthorizationToken'),
-    pluckDataFor('authorizationToken'),
-    pluckDataFor('authToken'),
-    pluckDataFor('authtoken'),
-    pluckDataFor('auth'),
-    pluckDataFor('token')
-  ].map(f => f(e, undefined))
-)
-
 /**
- *
+ * Token
  * @param e
+ * @param c
  */
-export const pluckCredentialsFromEvent = (e:Evt): ILoginInfoInput => ({
-  email: pluckDataFor('email')(e, null),
-  sig: pluckDataFor('sig')(e, null),
-  TFAtype: pluckDataFor('TFAtype')(e, undefined),
-  TFAchallengeResp: pluckDataFor('TFAchallengeResp')(e, undefined)
-})
+export const validatedPOST:IFunc = async (e, c) => {
+  // 2 INPUT MODES: statertoken || loginInfo
+  const tokenStr = pluckAuthTokenFromEvent(e)
+  const creds = pluckCredentialsFromEvent(e)
 
-// const makeSig = (creds:ILoginInfoInput, password: string):string =>
-//   createHmac('sha256', password)
-//     .update(JSON.stringify(creds, Object.keys(creds).sort()))
-//     .digest('hex')
+  if (tokenStr) {
+    const jwtUser = await jwtVerify()(tokenStr)
+      .then(async jwtOb => {
+        return {
+          ...jwtOb,
+          ...(await user.lookupVia({ typeID: 'email', exID: jwtOb.email }))
+        }
+      }).catch(er => undefined)
 
-// const isSigValid = (creds:ILoginInfoInput, base64password: string):boolean => {
-//   return creds.sig === null || creds.email == null
-//     ? false
-//     : creds.sig === makeSig(creds, btoa(base64password))
-// }
+    return validate(
+      postFinalTokenResponder,
+      { ...jwtUser, ...creds } as IAuthzFlat,
+      passIsProvidedAndValid,
+      isTOTPChallengeValid
+    )(e, c)
+  } else if (creds.email) {
+    // only given login info
+    const credUser = await user.lookupVia({ typeID: 'email', exID: creds.email })
 
-/**
- * @note Why use a thunk? I dont see the design pattern yet, feels like premature optim
- * @param e
- */
-// const findGrantedAuthzForUserfromEvent = async (e:Evt) => ({})
+    return validate(
+      postStarterTokenResponder,
+      { ...creds, ...credUser } as IAuthzFlat,
+      passIsProvidedAndValid,
+      emailNotProvided,
+      emailAddressInvalid
+    )(e, c)
+  } else {
+    // instead of validating everything missing case HERE IN the validated fetcher - pass the job down into validate - work through the
+    return {
+      statusCode: 400,
+      isBase64Encoded: false,
+      body: JSON.stringify({
+        errors: [{
+          code: 400,
+          reason: 'Email ',
+          InvalidDataVal: '',
+          InvalidDataLoc: '',
+          docRef: ''
+        } as Omit<ValidationResp, 'passed'>]
+      })
+    } as SRet
+  }
+}
 
-export const postResponser:Responder<authZData> = async (data, event, ctx) => {
-  const jwtUser = data.jwtUser
-  const authToken = await jwtSign()({ email: jwtUser.email, uacct: jwtUser.uacct, maxl25: jwtUser.maxl25 })
+export const validatedGET:IFunc = async (e, c) => {
+  const tokenStr = pluckAuthTokenFromEvent(e)
+  const creds = pluckCredentialsFromEvent(e)
+
+  const jwtUser = await jwtVerify()(tokenStr)
+    .then(async (jwtOb: JWTObject) =>
+      jwtOb.uacct
+        ? await user.getByID(jwtOb.uacct)
+        : await user.lookupVia({ typeID: 'email', exID: creds.email ?? '' })
+    )
+    // .catch(er => undefined)
+    // has to be caught in the validation steps
+
+  const auzhZData: IAuthzFlat = {
+    ...jwtUser,
+    ...pluckCredentialsFromEvent(e)
+  }
+
+  return validate(
+    getResponder,
+    auzhZData,
+    authTokenNotProvided,
+    authTokenInvalid
+  )(e, c)
+}
+
+export const postFinalTokenResponder:Responder<IAuthzFlatRequired> = async (data, event, ctx) => {
+  const { email, p, TFAtype, TFAchallengeResp, ...user } = data
+  const authToken = await jwtSign()({ email, uacct: user.uacct, maxl25: user.maxl25 })
   return {
     statusCode: 200,
     isBase64Encoded: false,
     cookies: [`authToken=${authToken}`],
-    body: JSON.stringify({ authToken, jwtUser })
+    body: JSON.stringify({ authToken, user })
   } as SRet
 }
 
-/**
- * Token
- * @param e
- * @param ctx
- */
-export const validatedPOST:IFunc = async (e, ctx) => {
-  const tokenStr = pluckAuthTokenFromEvent(e)
-  const jwtUser = await jwtVerify()(tokenStr).then(async jwtOb => {
-    return {
-      ...jwtOb,
-      ...(await user.lookupVia({ typeID: 'email', exID: jwtOb.email }))
-    }
+export const postStarterTokenResponder:Responder<IAuthzFlatRequired> = async (data, event, ctx) => {
+  const { email } = data
+  const starterToken = await jwtSign()({
+    email,
+    uacct: data.uacct,
+    maxl25: []
   })
-
-  const auzhZData: authZData = {
-    tokenStr: tokenStr ?? '',
-    jwtUser,
-    creds: pluckCredentialsFromEvent(e)
-  }
-
-  return validate(
-    postResponser,
-    auzhZData,
-    emailNotProvided,
-    sigNotProvided,
-    emailAddressInvalid,
-    sigInvalid
-  )(e, ctx)
+  return {
+    statusCode: 200,
+    isBase64Encoded: false,
+    cookies: [`starterToken=${starterToken}`],
+    body: JSON.stringify({ starterToken })
+  } as SRet
 }
 
-export const getRespoder:Responder<authZData> = async (authZData, e, c) => {
-  const { jwtUser } = authZData
+export const getResponder:Responder<IAuthzFlatRequired> = async (d, e, c) => {
+  const { email, p, TFAtype, TFAchallengeResp, ...usr } = d
   const nextAuthToken = await jwtSign()({
-    uacct: jwtUser.uacct,
-    email: jwtUser.email,
-    maxl25: jwtUser.maxl25
+    uacct: d.uacct,
+    email: d.email,
+    maxl25: d.maxl25
   })
   return {
     statusCode: 200,
     isBase64Encoded: false,
     cookies: [`authToken=${nextAuthToken}`],
     body: JSON.stringify({
-      authToken: nextAuthToken,
+      refreshedAuthToken: nextAuthToken,
+      user: usr,
       delegationStarterTokens: [], // I am a helper for these accounts, and they can revoke my access
       revocableDelegateStarterTokens: [] // I have these helpers for my account
     })
   } as SRet
-}
-
-export const validatedGET:IFunc = async (e, c) => {
-  const tokenStr = pluckAuthTokenFromEvent(e)
-  const jwtUser = await jwtVerify()(tokenStr).then(async jwtOb => {
-    return {
-      ...jwtOb,
-      ...(await user.lookupVia({ typeID: 'email', exID: jwtOb.email }))
-    }
-  })
-
-  const auzhZData: authZData = {
-    tokenStr: tokenStr ?? '',
-    jwtUser,
-    creds: pluckCredentialsFromEvent(e)
-  }
-
-  return validate(
-    getRespoder, auzhZData,
-    authTokenNotProvided,
-    authTokenInvalid
-  )(e, c)
 }
 
 /**
@@ -174,6 +175,8 @@ export const get: IFunc = async (e, c) => validatedGET(e, c)
 
 /**
  * POST :: loginInfo -> starterToken -> (+2FA)-> token
+ * StarterToken = token(email)
+ * FinalToken = StarterToken + H>Q>C(TFAType + TFAchallengeResp + sig)
  * @param e Event from Gateway
  * @param e.[[headers][queryStringParameters][cookies]].email
  * @param e.[[headers][queryStringParameters][cookies]].TFAchallengeResp

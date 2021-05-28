@@ -66,6 +66,8 @@
     "bcrypt": "^5.0.1",
     "dotenv": "^8.2.0",
     "dynamodb-toolbox": "^0.3.3",
+    "fido2-helpers": "^1.7.2",
+    "fido2-library": "^2.5.3",
     "fp-ts": "^2.9.3",
     "globby": "^11.0.1",
     "graphql": "^15.4.0",
