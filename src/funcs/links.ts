@@ -1,6 +1,7 @@
-import type { IFunc, Responder, SRet, Evt, Ctx } from '../types'
+import type { IFunc, Responder, SRet, Evt } from '../types'
 import { link, userAccess } from '../entities'
-import baseHandle from './common'
+import type { ILink } from '../entities/links'
+import baseHandle from '../utils/methodsHandler'
 import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
 // import { getJWTobject } from '../auths/validJWT'
 import JSON5 from 'json5'
@@ -16,7 +17,19 @@ export type ListOfLinks = {kind:'query', data:Promise<DocumentClient.QueryOutput
 const getListOfshorts = (e:Evt) => JSON5.parse(decodeURIComponent(e.queryStringParameters?.paths ?? '[]')) as string[]
 // const jwtObj = (e:Evt) => getJWTobject(e) as Promise<{uacct:string}>
 
-const getLinksBasedOnInput = (e:Evt) => {
+interface LinkQuery{
+  kind: 'query'
+  data: DocumentClient.QueryOutput
+}
+
+interface LinkBatch{
+kind: 'batch'
+data: ILink[]
+}
+
+type LinkQueryOrBatch = LinkBatch | LinkQuery
+
+const getLinksBasedOnInput = (e:Evt): ()=>Promise<LinkQueryOrBatch> => {
   const list = getListOfshorts(e)
 
   if (list.length === 0) {
@@ -37,8 +50,8 @@ const getLinksBasedOnInput = (e:Evt) => {
   }
 }
 
-export const getResponder: Responder = async (dataPayload:unknown, event:Evt, ctx:Ctx) => {
-  const data = dataPayload as ListOfLinks | undefined
+export const getResponder: Responder<LinkQueryOrBatch> = async (dataPayload, event, ctx) => {
+  const data = dataPayload
   const kind = data?.kind as 'query' | 'batch' | undefined
 
   if (kind === 'query') {

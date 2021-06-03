@@ -203,10 +203,9 @@ describe('Using a Test Harness', () => {
     expect(u).toHaveProperty('uacct')
   })
 
-  test('User - Mint User ID', async () => {
+  test('User - Mint User ID w/ Collision', async () => {
     const uacct = await user.mintUserID('LJJW2SCONZTEEQ32JZAU64KC')
-    // console.log({ uacct })
-    expect(uacct).toHaveLength(24)
+    expect(uacct).toHaveLength(30)
   })
 
   test('Is Password Valid for User', async () => {

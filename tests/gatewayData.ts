@@ -19,10 +19,10 @@ export const ctx = {
   succeed: (messageOrObject: any) => {}
 } as unknown as Context
 
-export const event = () => ({
+export const event = (METHOD: 'GET'|'PUT'|'POST'|'DELETE', path: string) => ({
   version: 'v2',
-  routeKey: 'GET /',
-  rawPath: '/',
+  routeKey: `${METHOD} ${path}`,
+  rawPath: `${path}`,
   rawQueryString: '',
   headers: {} as {[key:string]: string},
   requestContext: {
@@ -31,8 +31,8 @@ export const event = () => ({
     domainName: 'string',
     domainPrefix: 'string',
     http: {
-      method: 'GET',
-      path: '/',
+      method: METHOD,
+      path,
       protocol: 'https',
       sourceIp: '75.8.99.75',
       userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/74.0.3729.169 Safari/537.36'

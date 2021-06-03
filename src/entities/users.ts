@@ -29,12 +29,20 @@ interface TwoFABufferSec {
 type ITwoFactorOpt = TwoFAStringSec | TwoFABufferSec
 
 export interface IUser{
-  uacct:string
-  pwHash:string
-  displayName:string
+  uacct: string
+  email: string
+  pwHash: string
+  displayName: string
   oobTokens: ITwoFactorOpt[]
   backupCodes: string[]
-  maxl25:string[]
+  maxl25: string[]
+  delegation?:{
+    delegateFor: string[]
+    revocableStartersTo: string[]
+  }
+  cts: number
+  mts: number
+  entity: 'user'
 }
 
 const createRandomBytes = (bytes:number):Promise<Buffer> => new Promise((resolve, reject) => {
@@ -58,8 +66,8 @@ export const user = {
     const tryUacct = attemptUacct ?? base32.encode(nanoid(15))
     const u = await user.getByID(tryUacct)
     if (u) {
-      // collision found so re-attempt
-      return user.mintUserID()
+      // retry, because collision found so re-attempt
+      return user.mintUserID(`${attemptUacct}_${base32.encode(nanoid(15)).slice(0, 5)}`)
     } else {
       return tryUacct
     }
@@ -69,13 +77,14 @@ export const user = {
    * @param i
    * @readsDB 2x
    */
-  lookupVia: async (i:{typeID:'phone'|'email', exID:string}) => {
-    const { uacct } = (await userLookup.ent.get(i).catch(er => { throw new Error(er) })).Item
-
-    if (uacct) {
-      return user.getByID(uacct)
+  lookupVia: async (i:{typeID:'phone'|'email', exID?:string | null}) => {
+    if (i.exID) {
+      const UserDyn = await userLookup.ent.get(i)
+      return UserDyn.Item
+        ? user.getByID(UserDyn.Item.uacct)
+        : undefined
     } else {
-      throw new Error(`User Account ID was Invalid: ${{ uacct }}`)
+      return undefined
     }
   },
   /**
@@ -100,6 +109,30 @@ export const user = {
         /* istanbul ignore next */
         throw new Error(er)
       }),
+  genUser: async (
+    uacctReq:string,
+    plainTextPassword:string,
+    email?:string,
+    displayName?:string,
+    delegateToUaccts: string[] = [],
+    oobTokens: { strategy:string, uri:string, secret:string, label?:string }[] = [],
+    backupCodes: string[] = []
+
+  ) => {
+    const uacct = await user.mintUserID(uacctReq)
+    return {
+      uacct,
+      email,
+      displayName,
+      oobTokens: [...oobTokens, await user.otp.gen2FA(uacct, 'TOTP')],
+      backupCodes: [...backupCodes, ...await user.otp.genBackups()],
+      pwHash: await user.password.toHash(plainTextPassword),
+      delegation: {
+        delegateFor: [],
+        revocableStartersTo: delegateToUaccts
+      }
+    }
+  },
   password: {
     /**
      * @param passwordPlainText - plain text password
@@ -179,7 +212,10 @@ export const user = {
     isValidTOTP: async (uacct: string, TOTPcode: string) => {
       const u = await user.getByID(uacct)
       return (u.oobTokens as ITwoFactorOpt[])
-        .reduce((p, oob) => p || authenticator.check(TOTPcode, oob.secret.toString()), false)
+        .reduce(
+          (p, oob) => p || authenticator.check(TOTPcode, oob.secret.toString()),
+          false
+        )
     },
     /**
      * @param backUpCodeLen
@@ -192,8 +228,8 @@ export const user = {
     /**
      * @param email
      * @param strategy For now only TOTP is supported
-     * @note Please Save the secret,
      * @pure
+     * @note Please Save the secret
      */
     gen2FA: async (uacct:string, strategy :'TOTP' | 'SMS' | 'U2F' = 'TOTP', label?: string) => {
       if (strategy === 'TOTP') {
@@ -228,8 +264,10 @@ export const user = {
     timestamps: false,
     attributes: customTimeStamps({
       uacct: { type: 'string' },
+      email: { type: 'string' },
+      delegation: { type: 'map' },
       displayName: { type: 'string' },
-      oobTokens: { type: 'list' },
+      oobTokens: { type: 'list' }, // { strategy, uri, secret, label }[]
       backupCodes: { type: 'set', setType: 'string' },
       pwHash: { type: 'string' },
       pk: { hidden: true, partitionKey: true, dependsOn: 'uacct', default: (data:any) => user.pk(data) },

@@ -84,20 +84,29 @@ export interface UserKind {
 
 export const epoch = () => Date.now() //  epoch time in ms
 
-const credentials = process.env.AWS_KEY
-  ? new Credentials({
-    accessKeyId: process.env.AWS_KEY as string,
-    secretAccessKey: process.env.AWS_SECRET as string
-  })
-  : new SharedIniFileCredentials({
-    profile: 'default'
-  })
+export const config = process.env.AWS_KEY
+  ? {
+      region: 'us-west-2',
+      endpoint: undefined,
+      credentials: new Credentials({
+        accessKeyId: process.env.AWS_KEY as string,
+        secretAccessKey: process.env.AWS_SECRET as string
+      })
+    }
+  : { // local
+      region: 'us-west-2',
+      endpoint: 'http://localhost:4567',
+      credentials: {
+        secretAccessKey: 'NEVER_REPLACE_THIS_WITH_A_REAL_KEY',
+        accessKeyId: 'NEVER_REPLACE_THIS_WITH_A_REAL_SECRET'
+      }
+    }
 
 export const appTable = new Table({
   name: 'emooreAppTable',
   partitionKey: 'pk',
   sortKey: 'sk',
-  DocumentClient: new DynamoDB.DocumentClient({ credentials, region: 'us-west-2' })
+  DocumentClient: new DynamoDB.DocumentClient(config)
 })
 
 export const customTimeStamps = (i: EntityAttributes): EntityAttributes => ({

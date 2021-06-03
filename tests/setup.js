@@ -1,34 +1,38 @@
 const localDynamo = require('local-dynamo')
 const { DynamoDB } = require('aws-sdk')
 
-let dynamoLocal
+const TABLE_NAME = 'emooreAppTable'
+const TableName = TABLE_NAME
 
-module.exports = async () => {
+const main = async () => {
   // start local Dynamo Svc
   // and set the internals of the Entity framework to use the locally configured reader/writer
+
   const port = 4567
-
-  dynamoLocal = await localDynamo.launch(undefined, port)
-
-  // const credentials = new Credentials({
-  //   accessKeyId: process.env.AWS_KEY ?? 'NEVER_REPLACE_THIS_WITH_A_REAL_KEY',
-  //   secretAccessKey: process.env.AWS_SECRET ?? 'NEVER_REPLACE_THIS_WITH_A_REAL_SECRET'
-  // })
-
+  const dynamoLocal = await localDynamo.launch(undefined, port)
   console.log('...started dynamo local svc on pid: ', dynamoLocal.pid)
-  // console.log(process.env)
 
-  const dyn = new DynamoDB({
-    region: 'us-east-1',
-    endpoint: `http://localhost:${port}`,
-    credentials: {
-      secretAccessKey: 'NEVER_REPLACE_THIS_WITH_A_REAL_KEY',
-      accessKeyId: 'NEVER_REPLACE_THIS_WITH_A_REAL_SECRET'
-    }
-  })
+  const config = process.env.AWS_KEY
+    ? {
+        region: 'us-west-2',
+        endpoint: 'http://localhost:4567',
+        credentials: {
+          accessKeyId: process.env.AWS_KEY,
+          secretAccessKey: process.env.AWS_SECRET
+        }
+      }
+    : {
+        region: 'us-west-2',
+        endpoint: 'http://localhost:4567',
+        credentials: {
+          secretAccessKey: 'NEVER_REPLACE_THIS_WITH_A_REAL_KEY',
+          accessKeyId: 'NEVER_REPLACE_THIS_WITH_A_REAL_SECRET'
+        }
+      }
 
+  const dyn = new DynamoDB(config)
   await dyn.createTable({
-    TableName: 'emooreAppTable',
+    TableName,
     AttributeDefinitions: [
       { AttributeName: 'pk', AttributeType: 'S' },
       { AttributeName: 'sk', AttributeType: 'S' }
@@ -39,8 +43,27 @@ module.exports = async () => {
     ],
     BillingMode: 'PAY_PER_REQUEST',
     ProvisionedThroughput: {
-      ReadCapacityUnits: 5,
-      WriteCapacityUnits: 5
+      ReadCapacityUnits: 10,
+      WriteCapacityUnits: 10
     }
   }).promise()
+
+  const described = await dyn.describeTable({ TableName }).promise().catch(console.error)
+  console.log({
+    TableStatus: described?.Table?.TableStatus,
+    ItemCount: described?.Table?.ItemCount,
+    TableArn: described?.Table?.TableArn
+  })
+
+  return null
 }
+
+module.exports = main
+
+;(async () => {
+  if (!module.parent) {
+    console.log('independent run')
+    await main().catch(console.error)
+    console.log('leaving open... to run the service')
+  }
+})()

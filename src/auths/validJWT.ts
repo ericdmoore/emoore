@@ -10,10 +10,13 @@ import type {
   APIGatewayProxyStructuredResultV2 as SRet
 } from 'aws-lambda'
 
-import type { JWTObject } from '../types'
+import type { JWTObjectInput, JWTObjectOutput } from '../types'
 import jwt from 'jsonwebtoken'
 import HTTPStatusCodes from '../enums/HTTPstatusCodes'
 import { tryHead } from '../utils/first'
+import { parse as dotenvparse } from 'dotenv'
+import { readFileSync } from 'fs'
+import { resolve } from 'path'
 
 // #region interfaces
 export type IFuncRetValue = Promise<string | object | SRet| undefined>
@@ -27,8 +30,12 @@ export type Rejector = (reasons:RequestRejection[]) => IFunc
 export type Validator = (nextIfPass:IFunc) => IFunc
 
 // #endregion interfaces
-export const JWT_SECRET = process.env.JWT_SECRET as string
-export const JWT_SECRET_ID = process.env.JWT_SECRET_ID as string
+
+const envConfig = dotenvparse(readFileSync(resolve(__dirname, '../../cloud/.env')))
+export const JWT_SECRET = process.env.JWT_SECRET ?? envConfig.JWT_SECRET as string
+export const JWT_SECRET_ID = process.env.JWT_SECRET_ID ?? envConfig.JWT_SECRET_ID as string
+
+// NEVER PRINT THESE
 
 export const pluckJWTfromEvent = (event:Event) =>
   event.headers?.Token ??
@@ -63,18 +70,18 @@ export const getJWTobject = async (e:Event): Promise<unknown> => {
 }
 
 export const jwtVerify = (secretOrPublicKey: jwt.Secret | jwt.GetPublicKeyOrSecret = JWT_SECRET) =>
-  (token: string | undefined, opts?: jwt.VerifyOptions) : Promise<JWTObject> =>
+  (token: string | undefined, opts?: jwt.VerifyOptions) : Promise<JWTObjectOutput> =>
     new Promise((resolve, reject) => {
       if (!token) {
         reject(new Error('missing token for verification'))
       } else {
         jwt.verify(token, secretOrPublicKey, opts, (er, obj) =>
-          er ? reject(er) : resolve(obj as JWTObject)
+          er ? reject(er) : resolve(obj as JWTObjectOutput)
         )
       }
     })
 
-export const jwtSign = (secretOrPrivateKey: jwt.Secret = JWT_SECRET) => (payload: JWTObject, opts: jwt.SignOptions = { keyid: JWT_SECRET_ID }): Promise<string> =>
+export const jwtSign = (secretOrPrivateKey: jwt.Secret = JWT_SECRET) => (payload: JWTObjectInput, opts: jwt.SignOptions = { keyid: JWT_SECRET_ID }): Promise<string> =>
   new Promise((resolve, reject) => {
     const defaultOpts:jwt.SignOptions = { issuer: 'co.federa', expiresIn: 3600 * 24, keyid: JWT_SECRET_ID }
     jwt.sign(payload, secretOrPrivateKey, { ...defaultOpts, ...opts }, (er, obj) => {

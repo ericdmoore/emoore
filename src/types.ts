@@ -30,11 +30,21 @@ export interface RequestRejection{
 }
 export type Rejector = (reasons:RequestRejection[]) => IFunc
 export type Validator = (nextIfPass:IFunc) => IFunc
-export interface JWTObject{
+
+export interface JWTObjectInput{
     email: string
     maxl25: string[]
     uacct?: string
 }
+export interface JWTObjectOutput{
+    iat: number
+    exp: number
+    iss: string
+    email: string
+    maxl25: string[]
+    uacct?: string
+}
+
 export interface toolboxGetOptions {
     consistent?: boolean;
     capacity?: DocumentClient.ReturnConsumedCapacity;

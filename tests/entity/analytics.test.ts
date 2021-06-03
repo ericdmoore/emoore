@@ -1,10 +1,12 @@
-/* globals test beforeAll  expect */
+/* globals test expect beforeAll  afterAll  */
 
-import { DynamoDB } from 'aws-sdk'
+// import { DynamoDB } from 'aws-sdk'
+import { DocumentClient } from 'aws-sdk/clients/dynamodb'
+// import { DynamoDB } from 'aws-sdk'
 import { appTable, click } from '../../src/entities'
 import chunky from '../../src/utils/batchChunks'
 
-const msInDays = (n: number) => n * 24 * 3600_000
+const msInDays = (n: number) => n * 86_400_000
 const randInt = (asBigAs:number) => Math.floor(Math.random() * asBigAs)
 const randBetween = (lo: number, hi:number) => lo + (randInt(hi - lo))
 
@@ -18,6 +20,12 @@ interface ClickPutPayload{
   useragent: {[k:string]: string}
 }
 
+type Dict<T> = {[key:string]:T}
+
+const grabItems = (i: Dict <DocumentClient.WriteRequest>[]): DocumentClient.PutItemInputAttributeMap[] => i.reduce(
+  (p, obj) => [...p, ...Object.values(obj).map(v => v.PutRequest?.Item ?? undefined)], [] as (DocumentClient.PutItemInputAttributeMap | undefined)[]
+).filter(e => !!e) as DocumentClient.PutItemInputAttributeMap[]
+
 const genRandClickData = async (
   fillItems:number,
   startingDateMs: number,
@@ -27,40 +35,54 @@ const genRandClickData = async (
     long: 'https://example.com',
     useragent: { deviceType: 'mobile' }
   }) => {
-  const clickData = new Array(fillItems - 2).fill(0).map(
-    () => click.ent.putBatch({ ...example, time: randBetween(startingDateMs, finishDateMs) })
-  )
+  const clickData = new Array(fillItems - 2)
+    .fill(0)
+    .map(() =>
+      click.ent.putBatch({
+        ...example,
+        time: randBetween(startingDateMs, finishDateMs)
+      })
+    )
   clickData.push(click.ent.putBatch({ ...example, time: startingDateMs - 1000 }))
   clickData.push(click.ent.putBatch({ ...example, time: finishDateMs + 1000 }))
+
+  const regenData = grabItems(clickData)
+  // console.log(regenData.slice(0, 2))
 
   for (const chnk of chunky(clickData)) {
     await appTable.batchWrite(chnk)
   }
+
+  return regenData
 }
 
+let regenedClickData = [] as DocumentClient.PutItemInputAttributeMap[]
+
 beforeAll(async () => {
+  // const dynDB = new DynamoDB(config)
+  // console.log(appTable.entities)
+  // console.log({ AWS_KEY: process.env.AWS_KEY })
+  // console.log({ dynDB })
+  // console.log({ name: appTable.name })
+  // console.log(await dynDB.describeTable({ TableName: appTable.name }).promise().catch(console.error))
   console.log({ upTo400 })
 
-  const dyn = new DynamoDB({
-    region: 'us-east-1',
-    endpoint: 'http://localhost:4567',
-    credentials: {
-      secretAccessKey: 'NEVER_REPLACE_THIS_WITH_A_REAL_KEY',
-      accessKeyId: 'NEVER_REPLACE_THIS_WITH_A_REAL_SECRET'
-    }
-  })
-  const localDC = new DynamoDB.DocumentClient({ service: dyn })
-
-  // mutaes appTable
-  // in case they are not connected
-  appTable.DocumentClient = localDC
-  click.ent.table.DocumentClient = localDC
-
   const zero = ts
-  await genRandClickData(upTo400, zero, zero - msInDays(1)) // [now - 1d ago] with upTo400 Clicks
-  await genRandClickData(upTo400, zero - msInDays(1), zero - msInDays(4)) // [1d ago - 4d ago]
-  await genRandClickData(upTo400, zero - msInDays(4), zero - msInDays(14)) // [4d ago - 14d ago]
-  await genRandClickData(upTo400, zero - msInDays(14), zero - msInDays(90)) // [14d ago - 90d ago]
+  const items1 = await genRandClickData(upTo400, zero, zero - msInDays(1)) // [now - 1d ago] with upTo400 Clicks
+  const items2 = await genRandClickData(upTo400, zero - msInDays(1), zero - msInDays(4)) // [1d ago - 4d ago
+  const items3 = await genRandClickData(upTo400, zero - msInDays(4), zero - msInDays(14)) // [4d ago - 14d ago]
+  const items4 = await genRandClickData(upTo400, zero - msInDays(14), zero - msInDays(90)) // [14d ago - 90d ago]
+
+  regenedClickData = [...items1, ...items2, ...items3, ...items4]
+  // console.log(regenedClickData.slice(0, 10))
+}, TEST_TIMEOUT)
+
+afterAll(async () => {
+  for (const chnk of chunky(regenedClickData)) {
+    await appTable.batchWrite(
+      chnk.map(item => click.ent.deleteBatch(item))
+    )
+  }
 }, TEST_TIMEOUT)
 
 test('query DataStore for Dashboard.1 - 01 Day', async () => {

@@ -4,7 +4,7 @@ import { handler } from '../../src/funcs/root'
 import { event, ctx } from '../gatewayData'
 
 test('basic root test', async () => {
-  const r = await handler(event, ctx)
+  const r = await handler(event('GET', '/'), ctx)
   expect(r).toStrictEqual({
     statusCode: 300,
     headers: {

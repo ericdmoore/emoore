@@ -1,8 +1,10 @@
 INSPECTOR = npx graphql-inspector introspect
 LINTER = npx graphql-schema-linter
+TESTS = npx jest tests/*.test.ts tests/**/*.test.ts --coverage
+
 
 test: 
-	npx jest tests/*.test.ts tests/**/*.test.ts --coverage
+	npx jest tests/ --coverage
 
 tests: test
 

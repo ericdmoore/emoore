@@ -4,7 +4,7 @@ import type { IFunc, SRet, Evt, Ctx, Responder, NonNullObj } from '../types'
 export interface ValidationResp{
   code: number
   reason: string
-  passed:boolean
+  passed: boolean
   InvalidDataLoc?: string
   InvalidDataVal?: string
   docRef?: string
@@ -33,11 +33,14 @@ export const validate = <T>(responder: Responder<Required<NonNullObj<T>>>, authZ
       return data
     })
 
+  // console.log({ authZData, errors })
+
   if (hasNoErrors(authZData, errors)) {
     return responder(authZData, event, context)
   } else {
     return {
       statusCode: HttpStatusCode.BAD_REQUEST,
+      isBase64Encoded: false,
       body: JSON.stringify({ errors })
     } as SRet
   }

@@ -5,7 +5,7 @@ import { Entity } from 'dynamodb-toolbox'
 // import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import type { LinkKind } from './entities'
 
-interface ILink{
+export interface ILink{
   short: string
   long: string
   og?: {}

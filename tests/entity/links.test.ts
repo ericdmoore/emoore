@@ -55,7 +55,7 @@ describe('Using a Test Harness', () => {
 
   test('GetBatch  Email', async () => {
     const respArr = await link.getBatch(links.map(l => l.short))
-    console.log(respArr)
+    // console.log(respArr)
     expect(respArr).toHaveLength(2)
     respArr.forEach(v => {
       expect(v).toHaveProperty('short')
