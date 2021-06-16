@@ -4,7 +4,7 @@ import express from 'express'
 // import bodyParser from 'body-parser'
 // import { makeExecutableSchema } from 'graphql-tools'
 import { ApolloServer, gql } from 'apollo-server-express'
-import { schemaFromGlobs, resolversFromGlobs } from './merged'
+import { schemaFromGlobs } from './merged'
 
 ;(async () => {
   // eslint-disable-next-line no-unused-vars
@@ -13,7 +13,7 @@ import { schemaFromGlobs, resolversFromGlobs } from './merged'
     const app = express()
     const server = new ApolloServer({
       typeDefs: gql(await schemaFromGlobs()),
-      resolvers: await resolversFromGlobs(),
+      resolvers: {},
       playground: true
     })
 

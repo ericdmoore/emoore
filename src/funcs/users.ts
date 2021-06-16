@@ -167,7 +167,7 @@ const postResponder: Responder<Required<FlatPostUserInfo>> = async (d, e, c) => 
     uacct: usr.uacct,
     email: usr.email,
     displayName: usr.displayName,
-    delegation: usr.delegation
+    // delegation: usr.delegation
   }
 
   return {

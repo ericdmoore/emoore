@@ -11,7 +11,7 @@ import type {
 
 import JSON5 from 'json5'
 import { ApolloServer, gql } from 'apollo-server-express'
-import { schemaFromGlobs, resolversFromGlobs } from '../merged'
+import { schemaFromGlobs } from '../merged'
 
 // in order for esbuild to properly bundle
 // the only I know of to resolve the dependency tree
@@ -24,7 +24,7 @@ import { schemaFromGlobs, resolversFromGlobs } from '../merged'
 export const handler: Func = async (event, context) => {
   const server = new ApolloServer({
     typeDefs: gql(await schemaFromGlobs()),
-    resolvers: await resolversFromGlobs(),
+    resolvers: {},
     playground: true
   })
   const payload = JSON5.parse(event.body || '{}')
