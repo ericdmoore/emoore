@@ -33,16 +33,16 @@ interface FnReadyForGateway{
 // #endregion interfaces
 
 // func mamnifest
+
 const funcs = {
   // pattern
   // funcID: {src: path: methods?: apigV2.HttpMethod[], authorizer?: apigV2.IHttpRouteAuthorizer}
-  //
-  // @todo - turn maybe the root turns into a directory listing of downstream paths
   root: { path: '/', src: ['root.ts'], methods: [apigV2.HttpMethod.GET] },
-  graphql: { path: '/graphql', src: ['graphql.ts'], methods: [apigV2.HttpMethod.GET, apigV2.HttpMethod.POST] }
-  links: { path: '/links', src: ['links.ts'], methods: [apigV2.HttpMethod.ANY] },
+  tokens: { path: '/tokens', src: ['tokens.ts'], methods: [apigV2.HttpMethod.ANY] },
   users: { path: '/users', src: ['users.ts'], methods: [apigV2.HttpMethod.ANY] },
+  links: { path: '/links', src: ['links.ts'], methods: [apigV2.HttpMethod.ANY] },
   clicks: { path: '/clicks', src: ['clicks.ts'], methods: [apigV2.HttpMethod.ANY] }
+  // graphql: { path: '/graphql', src: ['graphql.ts'], methods: [apigV2.HttpMethod.GET, apigV2.HttpMethod.POST] }
 }
 
 /*
@@ -69,6 +69,7 @@ clicks
   const funcMap = await new Functions(cdkStack, 'id', 'dist')
     .addMoreFuncs(basePaths, funcs)
     .makeLambdas({}, {
+      external: ['mock-aws-s3', 'nock'],
       define: {
         'process.env.AWS_KEY': `"${processenv.AWS_KEY}"`,
         'process.env.AWS_SECRET': `"${processenv.AWS_SECRET}"`

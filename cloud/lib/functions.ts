@@ -99,11 +99,11 @@ export class Functions extends cdk.Construct {
     return Promise.all(
       Object.entries(this.props.srcPaths).map(([name, srcPath]) =>
         esbuild({
-          ...buildOpts,
+          external: ['aws-sdk'],
           bundle: true,
           platform: 'node',
           target: 'node14',
-          external: ['aws-sdk'],
+          ...buildOpts,
           entryPoints: [srcPath],
           outfile: this.props.bundledPaths[name]
         })

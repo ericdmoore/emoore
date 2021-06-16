@@ -12,6 +12,7 @@ import type {
 import { DynamoDB, Credentials } from 'aws-sdk'
 import { appTable } from '../entities/entities'
 
+// outhere for warmed functions
 const dyn = new DynamoDB({
   region: 'us-west-2',
   credentials: new Credentials({

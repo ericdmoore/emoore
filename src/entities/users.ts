@@ -17,16 +17,23 @@ import { userLookup } from './userLookup'
 interface TwoFAStringSec {
    strategy: 'TOTP' | 'SMS'
    secret: string
-   acctName: string
-   label?:string
+   // acctName: string use-displayName
+   userLabel?: string
 }
-interface TwoFABufferSec {
+
+// @ref overview:  https://developers.yubico.com/U2F/Protocol_details/Overview.html
+// @ref python implementation: https://github.com/Yubico/python-fido2/blob/master/examples/server/server.py
+
+interface TwoFAfido20 {
   strategy: 'U2F'
-  secret: Buffer
-  acctName: string
-  label?:string
+  userLabel: string
+  secret: string // semicolonX2 separated values - [secValue;; pubKey;; cert?]
+  keyHandle: string // keyID aka key-handle in the USB
+  pubKey: string | null
+  cert: string | null
+  counter?: number //  	RP verifies that the counter is hifgher than last time
 }
-type ITwoFactorOpt = TwoFAStringSec | TwoFABufferSec
+type ITwoFactorOpt = TwoFAStringSec | TwoFAfido20
 
 export interface IUser{
   uacct: string
@@ -36,16 +43,16 @@ export interface IUser{
   oobTokens: ITwoFactorOpt[]
   backupCodes: string[]
   maxl25: string[]
-  delegation?:{
-    delegateFor: string[]
-    revocableStartersTo: string[]
-  }
+  // delegation?:{ // should we rmeove this all together - how useful is this for links?
+  //   operateFor: string[] // i can do things for these people -- {uacct: string, roles:string[], starterToken:string}
+  //   revocableStartersTo: string[] // // these people can help me -- {uacct: string, roles:string[], starterToken:string}
+  // } 
   cts: number
   mts: number
   entity: 'user'
 }
 
-const createRandomBytes = (bytes:number):Promise<Buffer> => new Promise((resolve, reject) => {
+const createRandomBytes = (bytes:number): Promise<Buffer> => new Promise((resolve, reject) => {
   randomBytes(bytes, (er, d) => er ? reject(er) : resolve(d))
 })
 
@@ -109,28 +116,59 @@ export const user = {
         /* istanbul ignore next */
         throw new Error(er)
       }),
+  /**
+   * @writesDB
+   * @param email -
+   * @param plaintextPassword
+   * @param uacctInput
+   * @param displayName
+   * @param delegateToUaccts
+   * @param oobTokenInputs
+   * @param backupCodeInputs
+   */
   genUser: async (
-    uacctReq:string,
-    plainTextPassword:string,
-    email?:string,
-    displayName?:string,
+    email: string,
+    plaintextPassword: string,
+    uacctInput?: string,
+    displayName?: string,
     delegateToUaccts: string[] = [],
-    oobTokens: { strategy:string, uri:string, secret:string, label?:string }[] = [],
-    backupCodes: string[] = []
-
+    oobTokenInputs: { strategy:string, uri:string, secret:string, label?:string }[] = [],
+    backupCodeInputs: string[] = []
   ) => {
-    const uacct = await user.mintUserID(uacctReq)
+    const uacct = await user.mintUserID(uacctInput)
+    const oobTokens = [...oobTokenInputs, await user.otp.gen2FA(uacct, 'TOTP')]
+    const backupCodes = [...backupCodeInputs, ...await user.otp.genBackups()]
+    const pwHash = await user.password.toHash(plaintextPassword)
+    // const delegation = {
+    //   delegateFor: [] as string[],
+    //   revocableStartersTo: delegateToUaccts
+    // }
+
+    await user.ent.put({
+      uacct,
+      email,
+      // delegation,
+      displayName,
+      oobTokens,
+      backupCodes,
+      pwHash
+    })
+
+    await userLookup.ent.put({
+      uacct,
+      exID: email,
+      typeID: 'email',
+      isIDVerified: false
+    })
+
     return {
       uacct,
       email,
       displayName,
-      oobTokens: [...oobTokens, await user.otp.gen2FA(uacct, 'TOTP')],
-      backupCodes: [...backupCodes, ...await user.otp.genBackups()],
-      pwHash: await user.password.toHash(plainTextPassword),
-      delegation: {
-        delegateFor: [],
-        revocableStartersTo: delegateToUaccts
-      }
+      oobTokens,
+      backupCodes,
+      pwHash,
+      // delegation
     }
   },
   password: {
@@ -231,20 +269,20 @@ export const user = {
      * @pure
      * @note Please Save the secret
      */
-    gen2FA: async (uacct:string, strategy :'TOTP' | 'SMS' | 'U2F' = 'TOTP', label?: string) => {
+    gen2FA: async (uacct:string, strategy :'TOTP' | 'SMS' | 'U2F' = 'TOTP', userLabel?: string) => {
       if (strategy === 'TOTP') {
         const { secret } = await user.otp.createTOTPOption()
         const uri = authenticator.keyuri(uacct, 'emoo.re', secret)
-        return { strategy, uri, secret, label }
+        return { strategy, uri, secret, userLabel }
       } else if (strategy === 'SMS') {
         const secret = base32.encode(nanoid(5)).slice(0, 6)
         const jwt = `somejwt.including.${uacct}`
         const uri = `https://login.emoo.re?authToken=${jwt}`
-        return { strategy, uri, secret, label }
+        return { strategy, uri, secret, userLabel }
       } else if (strategy === 'U2F') {
-        const secret = await createRandomBytes(32)
-        const uri = 'read more docs to see if can be used for server challenge'
-        return { strategy, uri, secret, label }
+        const secret = `${await createRandomBytes(32)};;` // secret;; puKey;; cert
+        const uri = 'https://emoore.re'
+        return { strategy, uri, secret, userLabel }
       } else {
         /* istanbul ignore next */
         throw new Error('Invalid strategy type')
@@ -265,7 +303,11 @@ export const user = {
     attributes: customTimeStamps({
       uacct: { type: 'string' },
       email: { type: 'string' },
-      delegation: { type: 'map' },
+      // delegation: { type: 'map' }, // @see IUser
+      // what if delegation was done via macaroons anyway?
+      //
+      // groupMembership : { type: 'set', setType: 'string' }, // @see groupsHaveRolePrivelges
+      // withRoles : { type: 'set', setType: 'string' }, // @see groupsHaveRolePrivelges
       displayName: { type: 'string' },
       oobTokens: { type: 'list' }, // { strategy, uri, secret, label }[]
       backupCodes: { type: 'set', setType: 'string' },

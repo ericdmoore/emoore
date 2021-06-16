@@ -3,7 +3,7 @@ LINTER = npx graphql-schema-linter
 TESTS = npx jest tests/*.test.ts tests/**/*.test.ts --coverage
 
 
-test: 
+test: build-rm
 	npx jest tests/ --coverage
 
 tests: test
@@ -11,8 +11,8 @@ tests: test
 pwd: 
 	pwd
 
-cloud-install: 
-	cd cloud; npm i
+build-rm:
+	rm -rf build/
 
 build-cloud: 
 	cd cloud; pwd; npm run build; npx cdk synth
@@ -20,9 +20,15 @@ build-cloud:
 build-code:
 	pwd; npx tsc
 
-build: build-code
-	@echo Built Application Code
+build: build-code build-cloud
+	@echo Built Application Code And Cloud Comps
 
+cloud-install: 
+	cd cloud; npm i
+
+deploy:
+	cd cloud; pwd; npm run cdk deploy
+	
 schema-gen: 
 	npx ts-node src/models/mergeSchemas.ts
 

@@ -1,4 +1,15 @@
 /* globals describe test expect beforeEach afterEach beforeAll afterAll */
+
+/*
+Overview
+=============
+* POST :: user -> starterToken -> (+2FA?)-> token
+* POST :: user + delegation User -> delegation starterToken
+* GET :: token -> tokens
+* PUT :: token -> token
+* DELE :: token -> confimationMessage
+*/
+
 import type { SRet } from '../../src/types'
 import handler from '../../src/funcs/tokens'
 import { user, appTable } from '../../src/entities'
@@ -11,20 +22,20 @@ import { authenticator } from 'otplib'
 
 const userList = [
   {
-    email: 'tokens.user1@example.com',
     uacct: nanoid(12),
+    email: 'tokens.user1@example.com',
     displayName: 'Yoo Sir',
     plaintextPassword: 'A not so very Bad password for Yoo'
   },
   {
-    email: 'tokens.TimEst@example.com',
     uacct: nanoid(12),
+    email: 'tokens.TimEst@example.com',
     displayName: 'T Est',
     plaintextPassword: 'A not so very Bad password for Tim'
   },
   {
-    email: 'tokens.mdma@example.com',
     uacct: nanoid(12),
+    email: 'tokens.mdma@example.com',
     displayName: 'Molly',
     plaintextPassword: 'A not so very Bad password for Molly'
   }
@@ -74,15 +85,7 @@ afterAll(async () => {
   )
 })
 
-/*
-Overview
-=============
-* POST :: user -> starterToken -> (+2FA?)-> token
-* POST :: user + delegation User -> delegation starterToken
-* GET :: token -> tokens
-* PUT :: token -> token
-* DELE :: token -> confimationMessage
-*/
+
 
 describe('POST /tokens', () => {
   // beforeEach(async () => {})
@@ -111,25 +114,24 @@ describe('POST /tokens', () => {
     const { uacct, email, plaintextPassword } = userList[0]
     const usr = await user.getByID(uacct)
 
-    const e = { ...postEvent }
-    e.headers = {
-      email: encodeURIComponent(email),
-      p: atob(plaintextPassword),
-      TFAtype: 'TOTP',
-      TFAchallengeResp: authenticator.generate(
-        usr.oobTokens.filter(t => t.strategy === 'TOTP')[0].secret.toString()
-      )
+    const e = { 
+      ...postEvent, 
+      headers: {
+        email: encodeURIComponent(email),
+        p: atob(plaintextPassword),
+        TFAtype: 'TOTP',
+        TFAchallengeResp: authenticator.generate(
+          usr.oobTokens.filter(t => t.strategy === 'TOTP')[0].secret.toString()
+        )
+      }
     }
-
+    
     const resp = await handler(e, ctx) as SRet
     const body = (JSON.parse(resp.body ?? 'null') as any)
 
-    // console.log({ e })
-    // console.log({ body })
-
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
-    expect(body).toHaveProperty(['authToken'])
+    expect(body).toHaveProperty('authToken')
     expect(body?.authToken).toEqual(await signToken({ email, uacct, maxl25: [] }))
   })
 
@@ -172,6 +174,8 @@ describe('POST /tokens', () => {
     }, ctx) as SRet
     const completeTokenBody = (JSON.parse(completeTokenResp.body ?? '{}') as {} | {authToken:string, user:{uacct:string, email:string} })
 
+    // console.log({completeTokenBody})
+
     expect(completeTokenResp.statusCode).toBe(200)
     expect(completeTokenResp.isBase64Encoded).toBe(false)
     expect(completeTokenBody).toHaveProperty('authToken')
@@ -179,10 +183,10 @@ describe('POST /tokens', () => {
   })
 
   test('Token and Creds are out of step', async () => {
+    const e = { ...postEvent }
     const { uacct, email, plaintextPassword } = userList[0]
     const usr = await user.getByID(uacct).catch(er => ({ oobTokens: [] }))
 
-    const e = { ...postEvent }
     e.headers = {
       authToken: await signToken({
         uacct,
@@ -321,9 +325,9 @@ describe('POST /tokens', () => {
     expect(body).toHaveProperty('errors')
   })
 
-  test.todo('YooSir delegates Molly to His Account')
-  test.todo('Molly retrives an authToken for usage on Yoo`s behalf')
-  test.todo('Molly performs actions on Yoos behalf')
+  // test.todo('YooSir delegates Molly to His Account')
+  // test.todo('Molly retrives an authToken for usage on Yoo`s behalf')
+  // test.todo('Molly performs actions on Yoos behalf')
 })
 
 describe('GET /tokens', () => {
@@ -344,8 +348,8 @@ describe('GET /tokens', () => {
     const resp = await handler(e, ctx) as SRet
     const body = (JSON.parse(resp.body ?? 'null') as any)
 
-    const refreshedJWT = await verifyToken(body.refreshedAuthToken)
-    const initialJWTobj = await verifyToken(initalAuthToken)
+    const refreshedJWT = await verifyToken(body.refreshedAuthToken) as any
+    const initialJWTobj = await verifyToken(initalAuthToken) as any
 
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
@@ -381,16 +385,24 @@ describe('PUT /tokens', () => {
 
   beforeEach(async () => {})
   afterEach(async () => {})
-  test('Refresh token for Yoo', async () => {})
+  test.skip('Refresh token for Yoo', async () => {
+
+  })
 })
 
 describe('DELETE /tokens', () => {
   // eslint-disable-next-line no-unused-vars
   const tokEvt = event('DELETE', '/tokens')
+  // beforeEach(async () => {})
+  // afterEach(async () => {})
 
-  beforeEach(async () => {})
-  afterEach(async () => {})
-  test.skip('Revoke a delegation token for Yoo', async () => {
+  // test('Revoke a delegation token for Yoo', async () => {})
+})
 
-  })
+
+describe.skip('delegation via  tokens', () => {
+  // eslint-disable-next-line no-unused-vars
+  const tokEvt = event('DELETE', '/tokens')
+
+  // test('Revoke a delegation token for Yoo', async () => {})
 })

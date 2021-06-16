@@ -1,14 +1,18 @@
-import type { Evt } from '../types'
+import type { JWTObjectOutput, Evt } from '../types'
 import type { ValidationTest } from '../funcs/validations'
-import { user, IUser } from '../entities'
+import type { ILoginInfoInput } from '../funcs/tokens'
+import type { IUser } from '../entities'
+//
+import first from '../utils/first'
+import { user } from '../entities'
 import { createHmac } from 'crypto'
 import { btoa } from '../utils/base64'
 import { pluckDataFor } from '../utils/pluckData'
-import first from '../utils/first'
 import { jwtVerify } from '../auths/validJWT'
+import { hasElements } from '../utils/objectKeyCheck'
 
 // #region interfaces
-import type { ILoginInfoInput } from '../funcs/tokens'
+
 
 // type ReqdAuthZ = FullObject<authZ>
 // type PartAuthZ = {
@@ -31,7 +35,7 @@ export const pluckAuthTokenFromEvent = (e:Evt) => first(
   ].map(f => f(e, undefined))
 )
 
-const hasElements = (...elementList: string[]) => (input:any) => elementList.every(e => input?.[e])
+
 
 /**
 *
@@ -56,24 +60,30 @@ export const makeSig = (creds:ILoginInfoInput, password: string):string => {
 // #endregion helpers
 
 // #region validators
-export const emailShouldBeProvided: ValidationTest<AuthZFlatPartial> = async (e, c, d) => {
+export const emailShouldBeProvided: ValidationTest<unknown> = async (e) => {
+  const creds = pluckCredentialsFromEvent(e)
+
   return {
     code: 400,
     reason: 'Email Not Provided',
-    passed: !!d.email,
+    passed: !!creds.email,
     InvalidDataLoc: '[H>Q>C].email',
-    InvalidDataVal: d.email ? d.email : undefined,
+    InvalidDataVal: creds.email ? creds.email : undefined,
     docRef: ''
   }
 }
 
-export const passShouldBeProvidedAndValid: ValidationTest<AuthZFlatPartial> = async (e, c, d) => {
-  if (d.p && d.email) {
-    const u = await user.lookupVia({ typeID: 'email', exID: d.email })
+export const passShouldBeProvidedAndValid: ValidationTest<unknown> = async (e) => {
+  const creds = pluckCredentialsFromEvent(e)
+
+  if (creds.p && creds.email) {
+    // validator does look up???
+    const u = await user.lookupVia({ typeID: 'email', exID: creds.email })
+
     return {
       code: 400,
       reason: 'Password is Invalid For the Given Email',
-      passed: !!u && await user.password.isValidForUser({ uacct: u.uacct, passwordPlainText: d.p }),
+      passed: !!u && await user.password.isValidForUser({ uacct: u.uacct, passwordPlainText: creds.p }),
       InvalidDataLoc: '[H > Q > C].p',
       InvalidDataVal: 'Will Not show Password In PlainText',
       docRef: '##'
@@ -90,11 +100,12 @@ export const passShouldBeProvidedAndValid: ValidationTest<AuthZFlatPartial> = as
   }
 }
 
-export const emailAddressShouldBeValid: ValidationTest<AuthZFlatPartial> = async (e, c, d) => {
-  const exID = d?.email ?? '_missing_' as string
+export const emailAddressShouldBeValid: ValidationTest<unknown> = async (e, c, d) => {
+  const creds = pluckCredentialsFromEvent(e)
 
-  const u = await user.lookupVia({ typeID: 'email', exID })
-    .catch(er => { return null })
+  const u = creds.email
+    ? await user.lookupVia({ typeID: 'email', exID: creds.email })
+    : await Promise.resolve(undefined)
 
   return {
     code: 400,
@@ -106,7 +117,25 @@ export const emailAddressShouldBeValid: ValidationTest<AuthZFlatPartial> = async
   }
 }
 
-export const authTokenShouldBeProvided: ValidationTest<AuthZFlatPartial> = async (e, c, d) => {
+
+export const emailCredentialShouldMatchTheEmailInTheAuthToken: ValidationTest<unknown> = async (e, c, d) => {
+  const creds = pluckCredentialsFromEvent(e)
+  const authTok = pluckAuthTokenFromEvent(e)
+  const jwtUser = authTok ? await jwtVerify<JWTObjectOutput>()(authTok) : undefined
+
+  return {
+    code: 400,
+    reason: 'Email Addresses Must Match',
+    passed: jwtUser?.email 
+      ? jwtUser.email === creds.email 
+      : true,
+    InvalidDataLoc: '[H>Q>C].authToken#email === [H>Q>C].email',
+    InvalidDataVal: `${{email: creds?.email, authTokenEmail: jwtUser?.email}}`,
+    docRef: ''
+  }
+}
+
+export const authTokenShouldBeProvided: ValidationTest<unknown> = async (e) => {
   const authToken = pluckAuthTokenFromEvent(e)
   return {
     code: 400,
@@ -114,24 +143,11 @@ export const authTokenShouldBeProvided: ValidationTest<AuthZFlatPartial> = async
     passed: !!authToken,
     InvalidDataLoc: '',
     InvalidDataVal: authToken,
-    docRef: `Check Locations :: Headers > QuderyString > Cookies.
-    Then look for the most specific version of Authorization Tokens, 
-    where capitalization and full spelling make a version more specific. 
-    
-    Top line is most prefered
-    
-    [
-      'AuthorizationToken'
-      'authorizationToken'
-      'authToken'
-      'authtoken'
-      'auth'
-      'token'
-    ]`
+    docRef: `    ]`
   }
 }
 
-export const authTokenShouldBeValid: ValidationTest<AuthZFlatPartial> = async (e, c, d) => {
+export const authTokenShouldBeValid: ValidationTest<unknown> = async (e) => {
   const token = pluckAuthTokenFromEvent(e)
   const tokenObj = await jwtVerify()(token).catch(er => null)
   const doesVerify = !!tokenObj
@@ -153,19 +169,26 @@ export const authTokenShouldBeValid: ValidationTest<AuthZFlatPartial> = async (e
   }
 }
 
-export const authTokenShouldContainValidUacct: ValidationTest<AuthZFlatPartial> = async (e, c, d) => {
+export const authTokenShouldContainValidUacct = (sidecarKey:string): ValidationTest<unknown> => async (e) => {
   const token = pluckAuthTokenFromEvent(e)
-  const tokenData = await jwtVerify()(token).catch(er => null)
+  const tokenData = await jwtVerify<JWTObjectOutput>()(token).catch(er => null)
+  const usr = tokenData?.uacct
+    ? await user.getByID(tokenData.uacct).catch(er => undefined)
+    : await Promise.resolve(undefined)
+
+  const expensiveData = {[sidecarKey] :usr} as {[str:string] : unknown }
+  const passed = !!usr 
 
   return {
     code: 400,
-    reason: 'Cannot find a valid Uacct from the token',
-    passed: !!tokenData?.uacct,
+    reason: 'No User Exists by the given Uacct',
+    passed,
     InvalidDataLoc: '[H>Q>C].authToken',
-    InvalidDataVal: JSON.stringify(tokenData),
-    docRef: ''
+    InvalidDataVal: token,
+    docRef: '#',
+    ...(passed ? { expensiveData } : {})
   }
-}
+} 
 
 export const challengeTOTPShouldBeValid: ValidationTest<AuthZFlatPartial> = async (e, c, d) => {
   if (d?.email) {
@@ -181,7 +204,7 @@ export const challengeTOTPShouldBeValid: ValidationTest<AuthZFlatPartial> = asyn
       if (TFAtype === 'TOTP') {
         return {
           code: 400,
-          reason: 'Invalid TFA TOTP Challenge Response',
+          reason: 'Invalid TFA TOTP Challenge Rxesponse',
           passed: !!challengeResp && await user.otp.isValidOTP(d.uacct, challengeResp),
           InvalidDataLoc: 'H > Q > C',
           InvalidDataVal: challengeResp

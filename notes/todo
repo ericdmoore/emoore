@@ -1,0 +1,35 @@
+// x (priorityGrp) Dates[completed, created] Description{ +projectTag @contextTag due:DATE }
+// https://github.com/todotxt/todo.txt
+
+(ongoing) Deploys
+- Pre-Deploy Tests = Jest
+- Post-Deploy Tests?
+- - Make a Link and Delete a Link?
+- - - Verify User Account Login?
+- - - Using a Test User Account?
+- Using Github Actions?
+- - Secrets Management for CDK cli?
+
+Make a Short Link
+- (Preconditions)
+- - how to seed user accounts during deployment?
+- - 1. deploy with an admin who can add users shoud there be a loss of data
+- - 2. users application requests are open, but not accepted until a verification signature is added to the same request.
+
+Click a Short Link
+- Web Serving Tier?
+- CloudFront over the API?
+
+View Stats/Reports For Clicked Links
+- via API response
+- via a UI
+
+
+Questions:
+- What to do about an authToken if its compromised?
+- - if I know (aka: I accidentally put it in public repo?)
+- - - before it expires
+- - - then it expires
+- - if I dont know (aka: I inject it responsibly but other userscript, performs advsnced capture)
+- - - before it expires
+- - - then it expires

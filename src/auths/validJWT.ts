@@ -1,26 +1,15 @@
-import type {
-  // eslint-disable-next-line no-unused-vars
-  APIGatewayProxyHandlerV2 as Func,
-  // eslint-disable-next-line no-unused-vars
-  APIGatewayProxyEventV2 as Event,
-  APIGatewayEventRequestContext as Context,
-  // eslint-disable-next-line no-unused-vars
-  APIGatewayProxyResultV2 as Ret,
-  // eslint-disable-next-line no-unused-vars
-  APIGatewayProxyStructuredResultV2 as SRet
-} from 'aws-lambda'
-
-import type { JWTObjectInput, JWTObjectOutput } from '../types'
+import type  {IFunc,JWTObjectInput, SRet, Evt, Ctx, JWTelementsExtras} from '../types'
 import jwt from 'jsonwebtoken'
 import HTTPStatusCodes from '../enums/HTTPstatusCodes'
-import { tryHead } from '../utils/first'
+import first, { tryHead } from '../utils/first'
 import { parse as dotenvparse } from 'dotenv'
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
+import {pluckDataFor} from '../utils/pluckData'
+import { pluckAuthTokenFromEvent } from '../validators/tokens'
 
 // #region interfaces
-export type IFuncRetValue = Promise<string | object | SRet| undefined>
-export type IFunc = (event: Event, context: Context & {nextToken?: string}) => IFuncRetValue
+
 interface RequestRejection{
     reason: string
     message: string
@@ -37,66 +26,60 @@ export const JWT_SECRET_ID = process.env.JWT_SECRET_ID ?? envConfig.JWT_SECRET_I
 
 // NEVER PRINT THESE
 
-export const pluckJWTfromEvent = (event:Event) =>
-  event.headers?.Token ??
-  event.headers?.token ??
-  event.queryStringParameters?.Token ??
-  event.queryStringParameters?.token ??
-  tryHead(jwtCookies(event.cookies), undefined)
-
-const jwtCookies = (cookieArr:string[] = []) => cookieArr.filter(c => c.startsWith('Token=') || c.startsWith('token='))
-
-export const getJWTstrFromEventP = (event: Event):Promise<string> => {
+export const getJWTstrFromEventP = (event: Evt):Promise<string> => {
   return new Promise((resolve, reject) => {
-    const jwtStr = pluckJWTfromEvent(event)
+    const jwtStr = pluckAuthTokenFromEvent(event)
     jwtStr
       ? resolve(jwtStr as string)
       : reject(new Error(`A JWT String Was Expected in the Event. 
 
+      H = Headers
+      Q = QueryString
+      C = Cookies
+
       The Locations Checked - Top Locations are preferred [
-        $request.headers.Token,
-        $request.headers.token,
-        $request.queryString.Token,
-        $request.queryString.token,
-        $request.cookies.startsWith('Token=') ,
-        $request.cookies.startsWith('token=') ,
+        $request['H>Q>C].AuthorizationToken',
+        $request['H>Q>C].authorizationToken',
+        $request['H>Q>C].authToken',
+        $request['H>Q>C].authtoken',
+        $request['H>Q>C].auth',
+        $request['H>Q>C].token
       ]`))
   })
 }
 
-export const getJWTobject = async (e:Event): Promise<unknown> => {
-  const token = await getJWTstrFromEventP(e)
-  return jwtVerify(JWT_SECRET)(token)
-}
+export const getJWTobject = async (e:Evt): Promise<unknown> => jwtVerify(JWT_SECRET)(await getJWTstrFromEventP(e))
 
-export const jwtVerify = (secretOrPublicKey: jwt.Secret | jwt.GetPublicKeyOrSecret = JWT_SECRET) =>
-  (token: string | undefined, opts?: jwt.VerifyOptions) : Promise<JWTObjectOutput> =>
+export const jwtVerify = <OutputType extends JWTelementsExtras>(secretOrPublicKey: jwt.Secret | jwt.GetPublicKeyOrSecret = JWT_SECRET) =>
+  (token: string | undefined, opts?: jwt.VerifyOptions) : Promise<OutputType> =>
     new Promise((resolve, reject) => {
       if (!token) {
         reject(new Error('missing token for verification'))
       } else {
         jwt.verify(token, secretOrPublicKey, opts, (er, obj) =>
-          er ? reject(er) : resolve(obj as JWTObjectOutput)
+          er 
+            ? reject(er) 
+            : resolve(obj as unknown as OutputType)
         )
       }
     })
 
-export const jwtSign = (secretOrPrivateKey: jwt.Secret = JWT_SECRET) => (payload: JWTObjectInput, opts: jwt.SignOptions = { keyid: JWT_SECRET_ID }): Promise<string> =>
+export const jwtSign = <InputType extends object>(secretOrPrivateKey: jwt.Secret = JWT_SECRET) => (payload: InputType, opts: jwt.SignOptions = { keyid: JWT_SECRET_ID }): Promise<string> =>
   new Promise((resolve, reject) => {
     const defaultOpts:jwt.SignOptions = { issuer: 'co.federa', expiresIn: 3600 * 24, keyid: JWT_SECRET_ID }
-    jwt.sign(payload, secretOrPrivateKey, { ...defaultOpts, ...opts }, (er, obj) => {
+    jwt.sign(payload as InputType, secretOrPrivateKey, { ...defaultOpts, ...opts }, (er, obj) => {
       if (er) { reject(er) } else { resolve(obj as string) }
     })
   })
 
-export const rejectReqForReason: Rejector = (reasons) => async (event, context) => ({
+export const rejectReqForReason: Rejector = (reasons):IFunc => async (event, context) => ({
   statusCode: HTTPStatusCodes.FORBIDDEN,
   isBase64Encoded: false,
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ statusCode: HTTPStatusCodes.FORBIDDEN, message: 'Request Rejected', reasons })
 } as SRet)
 
-export const validJWT: Validator = (validatedFn) => async (event:Event, context:Context) => {
+export const validJWT: Validator = (validatedFn): IFunc => async (event:Evt, context:Ctx) => {
   const failureReasons: RequestRejection[] = []
 
   // prefers most specific & most formal
@@ -112,7 +95,7 @@ export const validJWT: Validator = (validatedFn) => async (event:Event, context:
 
   const { next, nextToken } = await jwtVerify(JWT_SECRET)(token)
   // .then() for ensuring the right data
-    .then((jwtObj) => Promise.all([validatedFn, jwtSign(JWT_SECRET)(jwtObj)]))
+    .then((jwtObj) => Promise.all([validatedFn, jwtSign(JWT_SECRET)(jwtObj as unknown as JWTObjectInput)]))
     .then(([next, nextToken]) => ({ next, nextToken }) as {next:IFunc, nextToken:string})
     .catch(() => {
       failureReasons.push({ reason: 'Invalid Authorization Token.', message: 'Ensure the provided JWT is valid', documentationRef: '' })
@@ -121,5 +104,13 @@ export const validJWT: Validator = (validatedFn) => async (event:Event, context:
 
   return next(event, { nextToken, ...context })
 }
-
+export const refreshToken = async <T extends JWTelementsExtras>(e:Evt):Promise<string> =>{
+  const authToken = pluckAuthTokenFromEvent(e)
+  if(!authToken){
+    return Promise.reject(Error('Cannot refresh a missing authToken'))
+  }else{
+    const {iat, ...obj} = await jwtVerify<T>()(authToken)
+    return jwtSign()( obj as object)
+  }
+}
 export default validJWT

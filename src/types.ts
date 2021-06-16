@@ -15,7 +15,7 @@ import type { ProjectionAttributes } from 'dynamodb-toolbox/dist/lib/projectionB
 import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import type { Table } from 'dynamodb-toolbox'
 
-export type Responder<T> = (responderAuthzData:T, event: Event, context: Context)=> Promise<Ret>
+export type Responder<T> = (responderAuthzData:T, event: Event, context: Context, someExtraDataFromValidators:{[key:string]:unknown})=> Promise<Ret>
 export type TableType<T> = T & { pk:string; sk:string }
 export type WithTimeStamp<T> = T & { cts:number; mts:number }
 export type Evt = Event
@@ -36,7 +36,7 @@ export interface JWTObjectInput{
     maxl25: string[]
     uacct?: string
 }
-export interface JWTObjectOutput{
+export interface JWTObjectOutput extends JWTelementsExtras{
     iat: number
     exp: number
     iss: string
@@ -45,6 +45,21 @@ export interface JWTObjectOutput{
     uacct?: string
 }
 
+export interface JWTelementsExtras {
+    alg: string // algorithm
+    typ: string // type
+    kid: number // key id
+    iat: number // issued at
+    exp: number // expires
+    iss: string // issuer
+    sub?: string // subject
+    aud?: string // audience
+    nbf?: number // not before
+    jti?: string // JWT ID
+}
+
+export type JWTelementsOptionInputs = Partial<JWTelementsExtras>
+    
 export interface toolboxGetOptions {
     consistent?: boolean;
     capacity?: DocumentClient.ReturnConsumedCapacity;

@@ -17,11 +17,11 @@ export const link = {
   pk: (data:{short:string}) => `l#${data.short}`,
   sk: (data:{short:string}) => `l#${data.short}`,
   get: (i:{short:string}) => link.ent.get(i).then(d => d.Item),
-  getBatch: async (shorts: string[]):Promise<ILink[]> => {
-    const arr = await appTable.batchGet(shorts.map(short => link.ent.getBatch({ short })))
-      .then(d => Object.values(d.Responses)) as ILink[][]
-    return arr.flat(1)
-  },
+  // getBatch: async (shorts: string[]):Promise<ILink[]> => {
+  //   const arr = await appTable.batchGet(shorts.map(short => link.ent.getBatch({ short })))
+  //     .then(d => Object.values(d.Responses)) as ILink[][]
+  //   return arr.flat(1)
+  // },
   ent: new Entity({
     table: appTable,
     name: 'link',

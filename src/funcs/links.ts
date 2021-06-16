@@ -32,23 +32,32 @@ type LinkQueryOrBatch = LinkBatch | LinkQuery
 const getLinksBasedOnInput = (e:Evt): ()=>Promise<LinkQueryOrBatch> => {
   const list = getListOfshorts(e)
 
-  if (list.length === 0) {
-    // iterate through list
-    return async () => {
-      // get the uacct
-      return {
-        kind: 'query' as 'query',
-        data: await userAccess.query({ uacct: '' })
-      }
+  return async () => {
+    // get the uacct
+    return {
+      kind: 'query' as 'query',
+      data: await userAccess.query({ uacct: '' })
     }
-  } else {
-    // batchget items
-    return async () => ({
-      kind: 'batch' as 'batch',
-      data: await link.getBatch(list)
-    })
   }
+
+  // if (list.length === 0) {
+  //   // iterate through list
+  //   return async () => {
+  //     // get the uacct
+  //     return {
+  //       kind: 'query' as 'query',
+  //       data: await userAccess.query({ uacct: '' })
+  //     }
+  //   } 
+  // } else {
+  //   // batchget items
+  //   return async () => ({
+  //     kind: 'batch' as 'batch',
+  //     data: await userAccess.query({uacct})
+  //   })
+  // }
 }
+
 
 export const getResponder: Responder<LinkQueryOrBatch> = async (dataPayload, event, ctx) => {
   const data = dataPayload

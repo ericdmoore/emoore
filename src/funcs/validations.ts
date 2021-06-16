@@ -8,10 +8,15 @@ export interface ValidationResp{
   InvalidDataLoc?: string
   InvalidDataVal?: string
   docRef?: string
+  expensiveData?: {[key:string]:unknown}
 }
 // the plain 'true' values are for conditional logic where one branch of a conditional passes - and the other side does not
 // this way the passing side can return true
 export type ValidationTest<T> = (event:Evt, context: Ctx, authZData: T) => Promise<ValidationResp | true>
+
+const hasNoErrors = <T, U>(input:T | {}, errorList:U[]): input is Required<NonNullObj<T>> => {
+  return errorList.length === 0
+}
 
 /**
  * @notes feels like it needs two types, the dirty input, and clearned normalized output
@@ -19,35 +24,45 @@ export type ValidationTest<T> = (event:Evt, context: Ctx, authZData: T) => Promi
  * Where the responder(happy path gets the CLEAN.OUTPUT type)
  * & the dirry input is the input for all the validation functions
  * @param responder
- * @param authZData
+ * @param preValidationData
  * @param tests
  * @returns
  */
-export const validate = <T>(responder: Responder<Required<NonNullObj<T>>>, authZData: T, ...tests:ValidationTest<Partial<T>>[]) : IFunc => async (event, context) => {
-  const errors = (await Promise.all(
-    tests.map(t => t(event, context, authZData))
-  )).filter((t) => typeof t === 'boolean' ? !t : !t.passed)
-    .map((t) => {
-      // .filter pulls out all plain `true` vals
-      const { passed, ...data } = t as ValidationResp
-      return data
-    })
+export const validate = <T>(responder: Responder<Required<NonNullObj<T>>>, preValidationData: T, ...tests:ValidationTest<Partial<T>>[]) : IFunc =>
+  async (event, context) => {
+    const allFuncResp = (
+      await Promise.all(
+        tests.map(async (t) => t(event, context, preValidationData))
+      ).catch(er => [{
+        code: 400,
+        reason: 'Experienced an Application Error During Validation',
+        passed: false,
+        InvalidDataVal: er
+      }] as ValidationResp[]))
 
-  // console.log({ authZData, errors })
+    const expensiveData = (allFuncResp.filter(t => typeof t !== 'boolean' ) as ValidationResp[])
+      .reduce(
+      (p, c) => ({ ...p, ...c.expensiveData }),
+      {} as {[key:string]:unknown}
+    )
 
-  if (hasNoErrors(authZData, errors)) {
-    return responder(authZData, event, context)
-  } else {
-    return {
-      statusCode: HttpStatusCode.BAD_REQUEST,
-      isBase64Encoded: false,
-      body: JSON.stringify({ errors })
-    } as SRet
+    const errors = (allFuncResp.filter(t => typeof t === 'boolean' ? !t : !t.passed) as ValidationResp[])
+      .map((t) => {
+        const { expensiveData, passed, ...data } = t as ValidationResp
+        return data
+      })
+
+    // console.log({ errors, preValidationData })
+    
+    if (hasNoErrors(preValidationData, errors)) {
+      return responder(preValidationData, event, context, expensiveData)
+    } else {
+      return {
+        statusCode: HttpStatusCode.BAD_REQUEST,
+        isBase64Encoded: false,
+        body: JSON.stringify({ errors })
+      } as SRet
+    }
   }
-}
-
-const hasNoErrors = <T, U>(input:T | {}, errorList:U[]): input is Required<NonNullObj<T>> => {
-  return errorList.length === 0
-}
 
 export default validate

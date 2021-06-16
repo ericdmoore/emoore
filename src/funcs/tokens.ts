@@ -1,4 +1,4 @@
-import type { IFunc, SRet, Responder, JWTObjectInput, NonNullObj } from '../types'
+import type { IFunc, SRet, Responder, JWTObjectInput, NonNullObj, JWTObjectOutput } from '../types'
 import type { IUser } from '../entities/users'
 // import type { ValidationResp } from './validations'
 
@@ -11,6 +11,7 @@ import {
   pluckAuthTokenFromEvent,
   emailAddressShouldBeValid,
   emailShouldBeProvided,
+  emailCredentialShouldMatchTheEmailInTheAuthToken,
   passShouldBeProvidedAndValid,
   authTokenShouldBeValid,
   authTokenShouldBeProvided,
@@ -69,17 +70,13 @@ export const validatedPOST:IFunc = async (e, c) => {
   // console.log(0, { tokenStr, credsInputs })
 
   if (hasAllCreds(credsInputs)) {
-    // console.log(1, 'validated POST: has all login Info')
-
-    const credUser = await user.lookupVia({
-      typeID: 'email',
-      exID: credsInputs?.email ?? '_missing_'
-    })
-
+    const exID = credsInputs.email as string
+    const credUser = await user.lookupVia({ typeID: 'email', exID })
+  
     let maxl25:string[] = []
     // token data beats creds
     if (tokenStr) {
-      const jwtUser = await jwtVerify()(tokenStr).then(u => { maxl25 = u.maxl25; return u })
+      const jwtUser = await jwtVerify<JWTObjectOutput>()(tokenStr).then(u => { maxl25 = u.maxl25; return u })
       if (credUser && jwtUser.email) {
         credUser.email = jwtUser.email
       }
@@ -88,29 +85,29 @@ export const validatedPOST:IFunc = async (e, c) => {
       }
     }
 
+    // console.log(1, 'hasAllCreds')
+
     return validate(
       postFinalTokenResponder,
       { ...credsInputs, ...credUser, maxl25 } as IAuthzFlat,
       emailShouldBeProvided,
       emailAddressShouldBeValid,
       passShouldBeProvidedAndValid,
-      challengeTOTPShouldBeValid
+      challengeTOTPShouldBeValid,
+      emailCredentialShouldMatchTheEmailInTheAuthToken,
     )(e, c)
   } else if (credsInputs.email) {
     // only given partial login info
     // console.log(2, 'validated POST: has email')
 
-    const credUser = await user.lookupVia({
-      typeID: 'email',
-      exID: credsInputs.email
-    })
+    const credUser = await user.lookupVia({ typeID: 'email', exID: credsInputs.email })
 
     return validate(
       postStarterTokenResponder,
       { ...credsInputs, ...credUser } as IAuthzFlat,
       emailShouldBeProvided,
       emailAddressShouldBeValid,
-      passShouldBeProvidedAndValid
+      passShouldBeProvidedAndValid,
     )(e, c)
   } else {
     // console.log(3, 'validated POST base case')
@@ -124,11 +121,36 @@ export const validatedPOST:IFunc = async (e, c) => {
   }
 }
 
+export const postFinalTokenResponder:Responder<IAuthzFlatRequired> = async (data, event, ctx) => {
+  // console.log('postFinalTokenResponder', data)
+  const { email, uacct, maxl25 } = data
+  const { backupCodes, p, pwHash, oobTokens, TFAchallengeResp, TFAtype, ...usr } = data
+  const authToken = await sign({ email, uacct, maxl25 })
+  return {
+    statusCode: 200,
+    isBase64Encoded: false,
+    cookies: [`authToken=${authToken}`],
+    body: JSON.stringify({ authToken, user: usr })
+  } as SRet
+}
+
+export const postStarterTokenResponder:Responder<IAuthzFlatRequired> = async (data, event, ctx) => {
+  // console.log('postStarterTokenResponder', data)
+  const { email, uacct } = data
+  const starterToken = await sign({ email, uacct, maxl25: [] })
+  return {
+    statusCode: 200,
+    isBase64Encoded: false,
+    cookies: [`starterToken=${starterToken}`],
+    body: JSON.stringify({ starterToken })
+  } as SRet
+}
+
 export const validatedGET:IFunc = async (e, c) => {
   const tokenStr = pluckAuthTokenFromEvent(e)
   const creds = pluckCredentialsFromEvent(e)
 
-  const jwtUser = await jwtVerify()(tokenStr)
+  const jwtUser = await jwtVerify<JWTObjectOutput>()(tokenStr)
     .then(async (jwtOb: JWTObjectInput) =>
       jwtOb.uacct
         ? await user.getByID(jwtOb.uacct)
@@ -150,34 +172,8 @@ export const validatedGET:IFunc = async (e, c) => {
   )(e, c)
 }
 
-export const postFinalTokenResponder:Responder<IAuthzFlatRequired> = async (data, event, ctx) => {
-  const { email, uacct, maxl25 } = data
-  const { backupCodes, p, pwHash, oobTokens, TFAchallengeResp, TFAtype, ...usr } = data
-  const authToken = await sign({ email, uacct, maxl25 })
-  return {
-    statusCode: 200,
-    isBase64Encoded: false,
-    cookies: [`authToken=${authToken}`],
-    body: JSON.stringify({ authToken, user: usr })
-  } as SRet
-}
-
-export const postStarterTokenResponder:Responder<IAuthzFlatRequired> = async (data, event, ctx) => {
-  const { email, uacct } = data
-  const starterToken = await sign({ email, uacct, maxl25: [] })
-  return {
-    statusCode: 200,
-    isBase64Encoded: false,
-    cookies: [`starterToken=${starterToken}`],
-    body: JSON.stringify({ starterToken })
-  } as SRet
-}
-
 export const getResponder:Responder<IAuthzFlatRequired> = async (d, e, c) => {
   const { uacct, maxl25, email, p, TFAtype, TFAchallengeResp, backupCodes, pwHash, oobTokens, ...usr } = d
-
-  // console.log(0, { data: d })
-
   const nextAuthToken = await sign({ uacct, email, maxl25 })
   return {
     statusCode: 200,
