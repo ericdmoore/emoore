@@ -15,7 +15,7 @@ build-rm:
 	rm -rf build/
 
 build-cloud: 
-	cd cloud; pwd; npm run build; npx cdk synth
+	cd cloud; pwd; npm ci; npm run build; npx cdk synth
 
 build-code:
 	pwd; npx tsc
