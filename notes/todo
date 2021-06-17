@@ -36,3 +36,58 @@ Questions:
 - - if I dont know (aka: I inject it responsibly but other userscript, performs advsnced capture)
 - - - before it expires
 - - - then it expires
+
+
+
+
+
+
+NOTE:
+Representing a 1st Party Delegable Macaroon
+
+<secret>
+[
+    [$secret,{svcURL:{data}},sig0],
+    [sig0,{caveatsChangeA},sig1],
+    [sig1,{caveatsChangeB},sig2],
+    
+    [sig4,{svc3:{dataChangesC}},sig5]
+]
+
+
+3rd Party
+[sig2,[{gooSvcURL:[[Ecv(kc,k2), Ecv(kGoo, kc)], {caveatsChangeC}},sig3], sig4]
+
+
+
+1. sigN = HMAC(key = sigN-1, payload)
+2. stip all secrets, and sigs
+3. keep change sets sep via a `+`
+4. `requiredProofActions` are ordered by order of addition in the chain
+5. 
+
+LibMethods
+
+- const mac1 = macaroon.create(issuerURL, secret, {header}, {opts})
+- const mac2 = macaroon.fromBase64(b64string)
+- const mac3 = macaroon.fromToJSON(jsonString)
+- const mac4 = macaroon.fromURL(urlString)
+
+- mac#addCaveat(key, value)
+- mac#addExternalCaveat(from, conditionKey, conditionValue)
+- mac#addHeader
+- mac#addFooter
+
+- `async` mac#isValid()
+- mac#ensureValid()
+
+- mac#toFunction = async (secret) => Promise<string>
+- mac#toBase64
+- mac#toJSON
+- mac#toURL
+
+
+
+1. give back to svcURL
+2. svcURL - will redir to gooSvcURL - which will yield a new/appended macaroon and set the next=urlencode(svc3URL)
+3. 
