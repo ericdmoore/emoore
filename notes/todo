@@ -87,7 +87,6 @@ LibMethods
 - mac#toURL
 
 
-
 1. give back to svcURL
 2. svcURL - will redir to gooSvcURL - which will yield a new/appended macaroon and set the next=urlencode(svc3URL)
 3. 
