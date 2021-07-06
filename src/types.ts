@@ -46,12 +46,12 @@ export interface JWTObjectOutput extends JWTelementsExtras{
 }
 
 export interface JWTelementsExtras {
-    alg: string // algorithm
-    typ: string // type
-    kid: number // key id
-    iat: number // issued at
-    exp: number // expires
-    iss: string // issuer
+    alg?: string // algorithm
+    typ?: string // type
+    kid?: number // key id
+    iat?: number // issued at
+    exp?: number // expires
+    iss?: string // issuer
     sub?: string // subject
     aud?: string // audience
     nbf?: number // not before

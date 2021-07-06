@@ -17,6 +17,9 @@ build-rm:
 build-cloud: 
 	cd cloud; pwd; npm ci; npm run build; npx cdk synth
 
+line-count:
+	npx ts-node tools/linecount.ts -- src/**/*.ts
+
 build-code:
 	pwd; npx tsc
 

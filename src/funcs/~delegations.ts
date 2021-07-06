@@ -36,7 +36,7 @@ const getResponder : Responder<{}> = async (d, e, c, sidecars) => {
     const u = sidecars.validUacct as unknown as IUser
     return {
       statusCode: 200,
-      ...await compressJsonBasedOnEvent(e, {
+      ...await compressJsonBasedOnEvent()(e, {
         user: {
           email: u.email,
           uacct: u.uacct,

@@ -9,7 +9,7 @@ export const userAccess = {
   pk: (i:{uacct: string}) => `u#${decodeURI(i.uacct)}`,
   sk: (i:{short: string}) => `ac#${decodeURI(i.short)}`,
   getBatch: async (i:{uacct: string, shorts:string[] }) => appTable.batchGet(i.shorts.map(short => userAccess.ent.getBatch({ uacct: i.uacct, short }))) as Promise<DocumentClient.BatchGetItemOutput>,
-  query: (i:{uacct: string }) => appTable.query(userAccess.pk(i), { beginsWith: 'ac#' }) as Promise<DocumentClient.QueryOutput>,
+  query: (i:{uacct: string }) => appTable.query( userAccess.pk(i), { beginsWith: 'ac#' }) as Promise<DocumentClient.QueryOutput>,
   queryRange: (i:{uacct: string, startLink:string, endLink: string }) => appTable.query(
     userAccess.pk(i), {
       between: [

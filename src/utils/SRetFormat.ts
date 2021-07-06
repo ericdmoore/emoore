@@ -67,22 +67,25 @@ const brotliP = async (i:PromiseOr<NoStatusSRet>):Promise<NoStatusSRet> => {
 
 // #endregion compasbale-compressors
 
-export const respSelector = <T extends string | object>(fmtInput:(i:T)=>Promise<NoStatusSRet>) => {
+export const respSelector = <T extends string | object>(fmtBody:(i:T)=>Promise<NoStatusSRet>, characterThreshold = 800) => 
+(defaultReturnValue:Partial<NoStatusSRet> = {}) => {
   // internal closure
-  const acceptsEncClosure = (s:string, i:T):Promise<NoStatusSRet> => {
+  const acceptsEncClosure = async (s:string, i:T):Promise<NoStatusSRet> => {
     switch (s) {
       case '*':
         // no-preference - we chose brotli
-        return brotliP(fmtInput(i))
+        return {...defaultReturnValue, ...await brotliP(fmtBody(i))}
       case 'br':
-        return brotliP(fmtInput(i))
+        return {...defaultReturnValue, ...await brotliP(fmtBody(i))}
       case 'gzip':
-        return gzipP(fmtInput(i))
+        return {...defaultReturnValue, ...await gzipP(fmtBody(i))}
       case 'deflate':
-        return deflateP(fmtInput(i))
+        return {...defaultReturnValue, ...await deflateP(fmtBody(i))}
       case 'identity':
-        return fmtInput(i)
+        return {...defaultReturnValue, ...await fmtBody(i)}
       default:
+        // found an odd Encoding ID string
+        // likley a compoud/weighted encoding string
         break
     }
 
@@ -90,23 +93,30 @@ export const respSelector = <T extends string | object>(fmtInput:(i:T)=>Promise<
       // one entry has a weighted option syntax
       return Promise.race(
         s.split(',')
-          .map(enc => acceptsEncClosure(enc.split(';')[0], i))
+          .map(enc => acceptsEncClosure(
+            enc.split(';')[0], // looking for key/head not the tail/value
+            i
+          ))
       )
     } else {
-      return fmtInput(i)
+      return {...defaultReturnValue, ...await fmtBody(i)}
     }
   }
 
-  return async (e:Evt, i:T) => {
+  return async (e:Evt, body:T) => {
+    // look for headers including 'accept-encoding'
+    // except nevermind with upper/lower casing
     const acceptedArr = Object.entries(e.headers)
       .map(([k, v]) => [k.toLowerCase(), v])
       .filter(([k, _]) => k === 'accept-encoding')
       .map(([_, v]) => v)
       .filter(v => v) as string[]
 
-    return JSON.stringify(i).length > 860 && acceptedArr.length >= 1
-      ? acceptsEncClosure(acceptedArr[0], i)
-      : fmtInput(i)
+    return JSON.stringify(body).length > characterThreshold && acceptedArr.length >= 1
+      // choose the first 
+      // since its only possible to have multiple if the request mixes upper/lower casing of accept-encoding
+      ? acceptsEncClosure(acceptedArr[0], body)
+      : fmtBody(body)
   }
 }
 

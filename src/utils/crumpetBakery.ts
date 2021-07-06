@@ -21,6 +21,8 @@
 
 import { URL } from 'url'
 import { createHmac } from 'crypto'
+import { brotliCompress } from 'zlib'
+import { promisify } from 'util'
 
 // #region interfaces
 type PromiseOR<T> =  T | Promise<T>
@@ -29,11 +31,11 @@ type Dict<T> = {[key:string]:T}
 type List<T> = T[]
 type Tuples = string[]
 interface IHeaders{
-    alg: 'chacha20-poly1305' | 'ed'
+    alg: 'sha384' | 'ed25519'
     enc: 'id' | 'br'
 }
 interface IConfiguration{
-    compressAfter? :number
+    compressAfter :number
 }
 
 interface IOptions {
@@ -53,6 +55,7 @@ interface ICrumpet{
     // promised due to possible compression
     toURL: () => Promise<URL>
     toJSON: () => Promise<string>
+    toObject: () => Promise<{headers:Dict<string>, body:Dict<string>, footers:Dict<string>, sig:string}>
     toBase64: () => Promise<string>
     toFunction: (secret:string, as:'json'| 'base64'|'url') => Promise<string>
     isValid: () => Promise<boolean>
@@ -84,9 +87,9 @@ const create = (
     secret:PromiseOR<string>, 
     initalCond: List<Tuples> = [], 
     opts: IOptions = {
-        headers:{alg:'chacha20-poly1305', enc:'id'}, 
+        headers:{alg:'sha384', enc:'id'}, 
+        cfg:{compressAfter:768},
         footers:{},  
-        cfg:{compressAfter:768}
     }
 ):ICrumpet => {
     // partial execute each of the method builder functions
@@ -95,6 +98,7 @@ const create = (
         addFooters: addFooters(issuer, secret, initalCond, opts),
         addHeaders: addHeaders(issuer, secret, initalCond, opts), 
         // addExternalCaveats: addExternalCaveats(issuer, secret, initalCond, opts),
+        toObject: toObject(issuer, secret, initalCond, opts),
         toJSON: toJSON(issuer, secret, initalCond, opts),
         toURL: toURL(issuer, secret, initalCond, opts),
         toBase64: toBase64(issuer, secret, initalCond, opts),
@@ -136,19 +140,71 @@ const ensureValid = (issuer:PromiseOR<string>, secret:PromiseOR<string>, initalC
 
 // #region serializers/exporters
 
+const toObject = (issuer:PromiseOR<string>, secret:PromiseOR<string>, initalCond: List<Tuples>=[], opts: IOptions) => 
+    async ()=>{
+        const body: Dict<string> = initalCond
+            .reduce((p, row)=>{
+                const [key, val] = row
+                return {...p, [key]: val}
+            },{} as Dict<string>)
+
+        const sig = await makeFinalSignature(secret, initalCond)
+        const {headers, footers} = opts
+        return {
+            headers: headers as unknown as Dict<string>,
+            body, 
+            footers,
+            sig
+        }
+    }
+
 const toJSON = (issuer:PromiseOR<string>, secret:PromiseOR<string>, initalCond: List<Tuples>=[], opts: IOptions) => async ()=>{
-    return ''
+    return JSON.stringify(create(issuer, secret,initalCond, opts).toObject())
 }
 
-const toBase64 = (issuer:PromiseOR<string>, secret:PromiseOR<string>, initalCond: List<Tuples>=[], opts: IOptions) => async ()=>{
-    // set header.enc to 'br' if it does get compressed
-    // issuer the first constraint
-    // colon sep terms
-    // term:value (newline)
+const toBase64 = (issuer:PromiseOR<string>, secret:PromiseOR<string>, initalCond: List<Tuples>=[], opts: IOptions) => 
+    async ()=>{
+        // <sig>.<header>.<body>.<footer>
+        // ALL footer is ignored by issuer
+        //
+        // set header.enc to 'br' if it does get compressed
+        // issuer the first constraint
+        // colon sep terms
+        // term:value (newline)
 
-    const sig = await makeFinalSignature(secret, initalCond)
-    return ''
-}
+        const {sig, body, footers, headers} = await toObject(issuer, secret,initalCond,opts)()
+
+        console.log({headers, body, sig, footers })
+
+        const hdrs = atob(
+            Object.entries(headers)
+            .reduce((p,[k,v])=>`${p}\n${k}:${v}`,'')
+        )
+
+        const b = atob(
+            Object.entries(body)
+            .reduce((p,[k,v])=>`${p}\n${k}:${v}`,'')
+        )
+
+        const f = atob(
+            Object.entries(footers)
+            .reduce((p,[k,v])=>`${p}\n${k}:${v}`,'')
+        )
+
+
+
+        return `${
+            hdrs
+        }.${
+            b.length > opts.cfg.compressAfter 
+                ? await promisify(brotliCompress)(b) 
+                : b 
+        }.${
+            sig
+        }.${
+            f
+        }`
+    }
 
 const toURL = (issuer:PromiseOR<string>, secret:PromiseOR<string>, initalCond: List<Tuples>=[], opts: IOptions) => async (param:string = 't')=>{
     // set header.enc to 'br' if it does get compressed 
@@ -174,25 +230,33 @@ const toFunction = (issuer:PromiseOR<string>, _:PromiseOR<string>, initalCond: L
 // #endregion serializers/exporters
 
 // #region helpers
-const getColumnOfSigs = async (secret:PromiseOR<string>, tupleData: List<Tuples>=[]) => {
-    return tupleData.reduce((p,c,i,a)=>{
-        const priorSec = lastOf(p)
-        return [...c, createHmac('sha256', priorSec)
-                .update(c.toString())
-                .digest('base64')] as string[]
-    },['','',await secret] as string[])
-}
-
 const lastOf = <T>(arr:T[])=>arr.slice(-1)[0]
 
+const getColumnOfSigs = async (secret:PromiseOR<string>, tupleData: List<Tuples>=[]) => {
+    const withSecretInRowZero = [['','',await secret], ...tupleData]
+        .map((c,i,a)=>{
+            return i===0 
+            ? c // leave top row alone - since it will get pulled off
+            : [ ...c, 
+                createHmac('sha384', lastOf( a[i-1]))
+                .update(c.toString())
+                .digest('base64')
+            ] as string[]
+        })
+    return withSecretInRowZero.slice(1).map(v=>lastOf(v))
+}
+
 const makeFinalSignature = async (secret:PromiseOR<string>, tupleData: List<Tuples>=[]) => {
+    // each row gets a sig - @see getColumnOfSigs , but to compute the final, 
+    // we omit saving out the intermediate sigs, and just roll them forward to the final'
+    // similar to #getColumnOfSigs, every colum as a calculated sig, 
+    // and the sig from the row above, is the seed/secret for the current's row sig
     return tupleData.reduce((p,c)=>{
-        return createHmac('sha256', p)
+        return createHmac('sha384', p)
             .update(c.toString())
             .digest('base64')
     }, await secret)
 }
-
 
 // #endregion helpers
 

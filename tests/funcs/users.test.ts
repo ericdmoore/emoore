@@ -22,7 +22,7 @@ interface IUserInfo extends JWTelementsOptionInputs{
 
 type IUerInfoOutputs = IUserInfo &  JWTelementsExtras
 
-const userList = [
+export const userList = [
   {
     email: 'users.user1@example.com',
     uacct: nanoid(12),

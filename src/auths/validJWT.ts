@@ -113,4 +113,63 @@ export const refreshToken = async <T extends JWTelementsExtras>(e:Evt):Promise<s
     return jwtSign()( obj as object)
   }
 }
+
+export const accessToken = ():ITokenStart<IAccessToken>=> {
+  const create = async (obj:IAccessToken)=>{
+    const token = await jwtSign()(obj)
+    return Object.freeze({ token, obj })
+  }
+  const fromString = async (token:string)=>{
+    const obj = await jwtVerify<IAccessToken>()(token)
+      .catch(er=>{throw Error('Access Token Could Not Be Verfied')})
+
+    return !obj?.uacct
+      ? Promise.reject(Error('AccessToken does not have a '))
+      : create(obj)
+  }
+  return {create, fromString }
+}
+
+export const authToken = ():ITokenStart<IAuthTokenInputs>=>{ 
+  const create = async (obj:IAuthTokenInputs)=>{
+    const token = await jwtSign()(obj)
+    return Object.freeze({ token, obj })
+  }
+
+  const fromString = async (token:string)=>{
+    const obj = await jwtVerify<IAuthTokenInputs>()(token)
+      .catch(er=>{throw Error('AuthToken could not be Verifed')})
+    
+    if(obj?.behalfOfUacct && obj?.scopes){
+      return create(obj)
+    }else{
+      return Promise.reject(Error(''))
+    }
+  }
+  return {create, fromString}
+}
+
+
+
+interface ITokenStart<T> {
+  create :(obj:T)=>Promise<TokenOutput<T>>
+  fromString :(token:string)=>Promise<TokenOutput<T>>
+}
+
+interface TokenOutput<T>{
+  obj: T
+  token: string
+}
+
+interface IAuthTokenInputs extends JWTelementsExtras{
+  behalfOfUacct: string
+  scopes: string[]
+}
+
+interface IAccessToken extends JWTelementsExtras{
+  uacct: string
+  email: string
+  last25: string[]
+}
+
 export default validJWT

@@ -6,6 +6,10 @@ Macaroons are a way to delegate authZ control.
 
 - Where users can choose to let someone perform some or all of their actions.
 - A service will only grant access iff everything is: understood, verifiable, and truthy
+- its iteresting because in a federated world, I might want to know you have a federated home, I can ship your goods to your digital home, 
+    or I might want to know that you are legit, 
+    by asking that you provide some social proof,
+    social proof bot-filtering
 
 
 ```
@@ -114,3 +118,54 @@ key1:value;key2:value
 key1:value;key2:value
 
 header.payload.sig
+
+
+
+NOTE:
+Representing a 1st Party Delegable Macaroon
+
+<secret>
+[
+    [$secret,{svcURL:{data}},sig0],
+    [sig0,{caveatsChangeA},sig1],
+    [sig1,{caveatsChangeB},sig2],
+    
+    [sig4,{svc3:{dataChangesC}},sig5]
+]
+
+
+3rd Party
+[sig2,[{gooSvcURL:[[Ecv(kc,k2), Ecv(kGoo, kc)], {caveatsChangeC}},sig3], sig4]
+
+
+
+1. sigN = HMAC(key = sigN-1, payload)
+2. stip all secrets, and sigs
+3. keep change sets sep via a `+`
+4. `requiredProofActions` are ordered by order of addition in the chain
+5. 
+
+LibMethods
+
+- const mac1 = macaroon.create(issuerURL, secret, {header}, {opts})
+- const mac2 = macaroon.fromBase64(b64string)
+- const mac3 = macaroon.fromToJSON(jsonString)
+- const mac4 = macaroon.fromURL(urlString)
+
+- mac#addCaveat(key, value)
+- mac#addExternalCaveat(from, conditionKey, conditionValue)
+- mac#addHeader
+- mac#addFooter
+
+- `async` mac#isValid()
+- mac#ensureValid()
+
+- mac#toFunction = async (secret) => Promise<string>
+- mac#toBase64
+- mac#toJSON
+- mac#toURL
+
+
+1. give back to svcURL
+2. svcURL - will redir to gooSvcURL - which will yield a new/appended macaroon and set the next=urlencode(svc3URL)
+3. 

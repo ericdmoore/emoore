@@ -66,7 +66,7 @@ const getResponder : Responder<{}> = async (d, e, c, sidecars) => {
 
   return {
     statusCode: 200,
-    ...await compressJsonBasedOnEvent(e, {
+    ...await compressJsonBasedOnEvent()(e, {
       user: {
         email: u.email,
         uacct: u.uacct,
@@ -121,7 +121,7 @@ const putResponder : Responder<{}> = async (d, e, c, sidecars) => {
   
   return {
     statusCode: 200,
-    ...await compressJsonBasedOnEvent(e, {
+    ...await compressJsonBasedOnEvent()(e, {
       status: 'updated',
       user: {
         uacct: userUdpates.uacct,
@@ -172,7 +172,7 @@ const postResponder: Responder<Required<FlatPostUserInfo>> = async (d, e, c) => 
 
   return {
     statusCode: 200,
-    ...await compressJsonBasedOnEvent(e, { user: userResp })
+    ...await compressJsonBasedOnEvent()(e, { user: userResp })
   } as SRet
 }
 
@@ -212,9 +212,7 @@ const deleResponder: Responder<{}> = async (d, e, c, sidecars) => {
   
   return {
     statusCode: 200,
-    ...await compressJsonBasedOnEvent(e, {
-      removed
-    })
+    ...await compressJsonBasedOnEvent()(e, { removed })
   } as SRet
 }
 
