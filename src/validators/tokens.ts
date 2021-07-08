@@ -143,7 +143,7 @@ export const authTokenShouldBeProvided: ValidationTest<unknown> = async (e) => {
     passed: !!authToken,
     InvalidDataLoc: '',
     InvalidDataVal: authToken,
-    docRef: `    ]`
+    docRef: ''
   }
 }
 
@@ -152,6 +152,8 @@ export const authTokenShouldBeValid: ValidationTest<unknown> = async (e) => {
   const tokenObj = await jwtVerify()(token).catch(er => null)
   const doesVerify = !!tokenObj
   const hasAllElems = hasElements('uacct', 'email', 'maxl25')(tokenObj)
+
+  // console.log({ tokenObj, doesVerify, hasAllElems })
 
   if (token) {
     return {

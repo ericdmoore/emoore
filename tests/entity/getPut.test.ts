@@ -11,20 +11,20 @@ const TEST_TIMEOUT = 45 * 1000
 
 beforeAll(async () => {
   // seed 1 link
-  await link.ent.put({
-    short: 'ddg',
-    long: 'https://ddg.co',
-    authzKey: '',
-    ownerID: 'ericmoore',
-    og: {
-      'og:title': 'DuckDuckGo',
-      'og:image': 'https://duckduckgo.com/assets/logo_homepage.normal.v108.svg',
-      'og:image:type': 'image/svg',
-      'og:image:width': '400',
-      'og:image:height': '300',
-      'og:image:alt': 'DuckDuckGo Logo'
-    }
-  })
+  await link.ent.put(
+    await link.create({
+      short: 'ddg',
+      long: 'https://ddg.co',
+      ownerUacct: 'ericdmoore',
+      og: {
+        'og:title': 'DuckDuckGo',
+        'og:image': 'https://duckduckgo.com/assets/logo_homepage.normal.v108.svg',
+        'og:image:type': 'image/svg',
+        'og:image:width': '400',
+        'og:image:height': '300',
+        'og:image:alt': 'DuckDuckGo Logo'
+      }
+    }))
 }, TEST_TIMEOUT)
 
 test('GET prefilled link', async () => {

@@ -1,21 +1,15 @@
 
 import type * as k from '../types'
 import type { LinkKind } from './entities'
-import base32 from 'hi-base32'
-import { appTable, customTimeStamps } from './entities'
-import { Entity } from 'dynamodb-toolbox'
 import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
 
+import { appTable, customTimeStamps } from './entities'
+import { Entity } from 'dynamodb-toolbox'
 import { nanoid } from 'nanoid'
+// import base32 from 'hi-base32'
 
 const linkFromStringOrStructured = async (v:BatchCreateElem, i:number, a: BatchCreateElem[]) => {
-  const l = typeof v === 'string'
-  ? await link.create({ long: v })
-  : await link.create(v)
-  
-  // console.log({l,ret})
-  // return ret
-  return link.ent.putBatch(l)
+  return link.ent.putBatch(await link.create(v))
 }
 
 const didFindResult = (result?:any):boolean=> !!result && Object.keys(result).length !== 0
@@ -23,10 +17,10 @@ const didFindResult = (result?:any):boolean=> !!result && Object.keys(result).le
 export const link = {
   pk: (data:{short:string}) => `l#${data.short}`,
   sk: (data:{short:string}) => `l#${data.short}`,
-  get: (i:{short:string}) => link.ent.get(i),
+  get: (i:{short:string}) => link.ent.get(i).then(d=> d.Item),
   create : async (linkInputs:CreateLinkInput):Promise<ILink>=>({
     ...linkInputs,
-    ownwerUacct: 'ericdmoore',
+    ownerUacct: 'ericdmoore',
     isDynamic: linkInputs.isDynamic ?? false,
     short: await link.ensureVanityAvail(linkInputs.short)
   }),
@@ -34,6 +28,7 @@ export const link = {
     // console.log({short,tries, tryLen})
     if(short){
       if(didFindResult(await link.ent.get({short}).catch(er => {return null}))){
+        /* istanbul ignore else */
         if(tries <= 3){
           return link.ensureVanityAvail( nanoid(tryLen), tries+1)
         }else{
@@ -50,24 +45,22 @@ export const link = {
     }
   },
   dynamicConfig:{
-    rotate:(urls:UrlList<number>) => ({rotate: urls}),
-    hurdle:(urls:UrlList<number>) => ({hurdle: urls}),
-    geo:(urls:UrlList<string>) => ({geo: urls}),
-    keepalive:(urls:UrlList<number>) => ({keepalive: urls}),
+    geos:(urls:UrlSwitchAt<string>[]):DynamicGeo => ({geos: urls}),
+    rotates:(urls:UrlSwitchAt<number>[]):DynamicRotate => ({rotates: urls}),
+    expires:(urls:UrlSwitchAt<number>[]):DynamicExpires => ({expires: urls}),
+    hurdles:(urls:UrlSwitchAt<number>[]):DynamicHurdle => ({hurdles: urls}),
+    keepalive:(urls:UrlSwitchAt<number>[]):DynamicKeepAlive => ({keepalive: urls}),
   },
   batch:{
     create: async (inputs:BatchCreateElem[]) : Promise<ILink[]> => {
       const batchinput = await Promise.all(inputs.map(linkFromStringOrStructured))
       await appTable.batchWrite(batchinput)
-      // console.log(JSON.stringify(batchinput,null, 2))
-      // peel off the table key from each obj already in the array
       return batchinput.map(b=>Object.values(b)).flat(1).map(v=> v.PutRequest?.Item as ILink)
     },
     get: async (shorts: BatchGetElem[]):Promise<ILink[]> => {
       const batchGet = await appTable.batchGet(
         shorts.map(l=>link.ent.getBatch(l)) 
       ) as DocumentClient.BatchGetItemOutput
-
       return Object.values(batchGet.Responses ?? {}).flat(1) as ILink[]
     },
   },
@@ -81,7 +74,7 @@ export const link = {
       // sk + required
       long: { type: 'string', required: true },
       isDynamic: {type:'boolean', default: false },
-      ownwerUacct: { type: 'string', required: true, default:'ericdmoore' },
+      ownerUacct: { type: 'string', required: true, default:'ericdmoore' },
       //
       og: { type: 'map' },
       tags: { type: 'map' },
@@ -97,7 +90,7 @@ export const link = {
 
 export interface CreateLinkInput{
   long: string
-  ownwerUacct?:string
+  ownerUacct?:string
   short?: string    
   isDynamic?:boolean
   og?: Dict<string> 
@@ -110,7 +103,7 @@ export interface ILink{
   short: string
   long: string
   isDynamic: boolean
-  ownwerUacct: string
+  ownerUacct: string
   og?: Dict<string>
   tags?: Dict<string>
   params?: Dict<string>
@@ -118,10 +111,10 @@ export interface ILink{
 }
 
 type Dict<T> = {[s:string]:T}
-type UrlList<T> = { 
+export type UrlSwitchAt<T> = {
   at: T
   url: string | DynamicKind 
-}[]
+}
 
 // needs long
 export type BatchCreateElem = {long:string, short?:string}
@@ -129,12 +122,14 @@ export type BatchCreateElem = {long:string, short?:string}
 // needs short
 export type BatchGetElem = {short:string, long?:string}
 
-interface DynamicRotate {rotate:UrlList<number>} //--> url-like
-interface DynamicHurdle {hurdle:UrlList<number>} //--> url-like
-interface DynamicGeo {geo:UrlList<string>} //--> url-like
-interface DynamicKeepAlive{keepalive:UrlList<number>} //--> url-like
+export interface DynamicRotate {rotates:UrlSwitchAt<number>[]} //--> url-like
+export interface DynamicExpires {expires:UrlSwitchAt<number>[]} //--> url-like
+export interface DynamicHurdle {hurdles:UrlSwitchAt<number>[]} //--> url-like
+export interface DynamicGeo {geos:UrlSwitchAt<string>[]} //--> url-like
+export interface DynamicKeepAlive{keepalive:UrlSwitchAt<number>[]} //--> url-like
 
-type DynamicKind = 
+export type DynamicKind =
+| DynamicExpires
 | DynamicRotate
 | DynamicHurdle
 | DynamicGeo

@@ -3,7 +3,7 @@ LINTER = npx graphql-schema-linter
 TESTS = npx jest tests/*.test.ts tests/**/*.test.ts --coverage
 
 
-test: build-rm
+test:
 	npx jest tests/ --coverage
 
 tests: test

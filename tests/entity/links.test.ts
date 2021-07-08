@@ -32,8 +32,8 @@ describe('Using a Test Harness', () => {
     await link.batch.create(links)
     // console.log('scan: ',  await appTable.scan() )
     // console.log('now batch get: ', await link.batch.get(links))
-    console.log('now query: ', await appTable.query( link.pk(links[0]),{beginsWith: link.sk(links[0])} ) )
-  },9999)
+    // console.log('now query: ', await appTable.query( link.pk(links[0]),{beginsWith: link.sk(links[0])} ) )
+  })
 
   afterAll(async () => {
     const links = await lanks
@@ -43,33 +43,85 @@ describe('Using a Test Harness', () => {
   test('Verifiy Test Harness via the Example Link Hokey Pokey', async ()=>{
     const links = await lanks
     const c = await link.batch.get([{short:'ex'}])
-    console.log(c)
     expect(c.filter(v=>v.long === links[0].long )).toHaveLength(1)
-  },9000)
+  })
 
-  test.skip('Get via Short Code', async () => {
+  test('Get via Short Code', async () => {
     const links = await lanks
     const { short } = links[0]
     const l = await link.get({ short })
-
-    console.log(l)
 
     expect(l).toHaveProperty('short')
     expect(l).toHaveProperty('long')
     expect(l).toHaveProperty('cts')
     expect(l).toHaveProperty('mts')
-    // can not guarentee these props
-    // expect(l).toHaveProperty('ownerID')
-    // expect(l).toHaveProperty('authzKey')
+    expect(l).toHaveProperty('isDynamic')
+    expect(l).toHaveProperty('ownwerUacct')
   })
 
-  test.skip('GetBatch Email', async () => {
-  //   const respArr = await link.getBatch(links.map(l => l.short))
-  //   // console.log(respArr)
-  //   expect(respArr).toHaveLength(2)
-  //   respArr.forEach(v => {
-  //     expect(v).toHaveProperty('short')
-  //     expect(v).toHaveProperty('long')
-  //   })
+  test('Already Used Vanity URL Test', async () => {
+    const links = await lanks
+    const l = await link.create({
+      short:'ex', 
+      long:'https://exmaple-of-unavailable-vainity.com'
+    })
+
+    await link.ent.put(l)
+    const l2 = await link.get({short: l.short})
+
+    expect(l2.short).not.toEqual('ex')
+    expect(l2).toHaveProperty('short')
+    expect(l2).toHaveProperty('long')
+    expect(l2).toHaveProperty('cts')
+    expect(l2).toHaveProperty('mts')
+    expect(l2).toHaveProperty('isDynamic')
+    expect(l2).toHaveProperty('ownwerUacct')
   })
+
+  test('Make a Dynamic URL', async () => {
+    const links = await lanks
+    const {rotates, geos, hurdles, keepalive} = link.dynamicConfig
+
+    const almostWinner:string = 'https://almostwinner.raffle.com'
+    const youWin:string = 'https://youwin.raffle.com'
+
+    const USraffleAutoClose = keepalive([
+      { at:10000, url: hurdles([
+          { at:10_000, url: almostWinner},
+          { at:12_000, url: youWin},
+        ])
+      }
+    ])
+
+    const CANraffle = hurdles([
+      { at:10_000, url: 'https://almostCanada.raffle.com'},
+      { at:12_000, url: 'https://winnerCanada.raffle.com'},
+    ])
+
+    const linky = await link.create({
+      short:'ex2', 
+      long:'https://root-level-url-exmaple.com',
+      dynamicConfig: geos([
+        { at:'US', url: USraffleAutoClose},
+        { at:'CAN', url: CANraffle},
+        { at:'_', url: rotates([
+          {at:1, url: USraffleAutoClose},
+          {at:1, url: CANraffle}])
+        }
+      ])
+    })
+
+    await link.ent.put(linky)
+    const l = await link.get({short: linky.short})
+
+    expect(l.short).not.toEqual('ex')
+    expect(l).toHaveProperty('short')
+    expect(l).toHaveProperty('long')
+    expect(l).toHaveProperty('cts')
+    expect(l).toHaveProperty('mts')
+    expect(l).toHaveProperty('isDynamic')
+    expect(l).toHaveProperty('ownwerUacct')
+    expect(l).toHaveProperty('dynamicConfig')
+  })
+
 })

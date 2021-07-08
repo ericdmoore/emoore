@@ -7,25 +7,15 @@ import { jwtSign } from '../../src/auths/validJWT'
 import { nanoid } from 'nanoid'
 import { appTable, user, link, userLookup } from '../../src/entities'
 
-const URIencodeJSONStrVals = function(_:any,value:unknown){
-  type Element = string | {short?:string, long:string}
-  type Val = Element | Element[]
-  const val = value as Val
-  
-  if(typeof val ==='string'){
-    // base case
-    return encodeURIComponent(val)
-  }else{
-    //could be string[] or {long, short}
-    // both cause the function to recurse
-    // punt till we get to the base case
-    return val
-  }
+const URIencodeJSONStrVals = function(_:any,v:(string | {short?:string, long:string})[]){
+  return typeof v ==='string'
+    ? encodeURIComponent(v)
+    : v
 }
 
 const JSONStringerWithURIEncode = (i:any)=>JSON.stringify(i, URIencodeJSONStrVals)
 
-const JSONParse = (input:any)=>{
+const JSONParse = (input:string)=>{
   try{
     return {er:null, data: JSON.parse(input)}
   }catch(er){
@@ -54,25 +44,29 @@ const preLoadUsers = [
   }
 ]
 
-export const preLoadLinks = [
-  { short:'ex', 
+export const lanks = (() => Promise.all([
+  link.create({
+    short:'ex', 
     long:'https://example.com',
-    ownerUacct: preLoadUsers[0].uacct
-  },
-  { short:'im', 
+    ownerUacct:preLoadUsers[0].uacct
+  }),
+  link.create({ 
+    short:'im', 
     long:'https://im.ericdmoore.com',
     ownerUacct: preLoadUsers[0].uacct
-  },
-  { short:'me',
+  }),
+  link.create({ 
+    short:'me',
     long:'https://ericdmoore.com',
     ownerUacct: preLoadUsers[1].uacct
-  },
-]
+  }),
+]))()
 
 beforeAll(async () => {
   // setup links
-  await appTable.batchWrite(preLoadLinks.map(l => link.ent.putBatch(l)))
-  
+  const links = await lanks
+  await link.batch.create(links)
+
   // setup users
   await appTable.batchWrite(
     await Promise.all(
@@ -97,8 +91,9 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  const links = await lanks
   // tear down links
-  await appTable.batchWrite(preLoadLinks.map(l => link.ent.deleteBatch(l)))
+  await appTable.batchWrite(links.map(l => link.ent.deleteBatch(l)))
 
   // tear down users
   await appTable.batchWrite(
@@ -115,14 +110,15 @@ afterAll(async () => {
 describe.only('POST /links', () => {
   const postLinkEvt = event('POST', '/links')
   
-  test.only('Most Basic POST', async () => {
+  test('Most Basic POST', async () => {
     // Remember: H > Q > C
     // 
+    const links = await lanks
     const e:Evt = {
       ...postLinkEvt,
       headers:{
-        token : await jwtSign()({uacct:nanoid(), email:'eric.d.moore@gmail.com', last25:[]}),
-        paths : JSONStringerWithURIEncode([
+        token : await jwtSign()({ uacct:nanoid(), maxl25:[], email:'eric.d.moore@gmail.com' }),
+        longpaths : JSONStringerWithURIEncode([
           'https://im.ericdmoore.com/path1',
           'https://im.ericdmoore.com/path2',
           {
@@ -139,11 +135,16 @@ describe.only('POST /links', () => {
     const resp = await handler(e, ctx) as SRet
     const {er, data} = JSONParse(resp?.body ?? '{}')
     const body = data
+    
+    console.log(body)
+
     expect(er).toBeFalsy()
     expect(resp).toHaveProperty('statusCode',200)
     expect(resp).toHaveProperty('isBase64Encoded',false)
     expect(resp).toHaveProperty('body')
-    expect(body).toBeTruthy()
+    
+    expect(body).toHaveProperty('links')
+    expect(body.links).toHaveLength(4)
 })
   
   test.skip('POST Lacks Auth fails with a 400', async()=>{
