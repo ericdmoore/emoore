@@ -19,12 +19,15 @@ test('User - DynDB Inputs', async () => {
 })
 // #endregion pure-tests
 
-const lanks = ( async ()=>[
-  { short: 'ex', long: 'https://example1.com' },
-  { short: 'example', long: 'https://example2.com' },
-  { short: 'short', long: 'https://long-link-example.com' },
-  await link.create({long: 'https://long-link-example.com'})
-])()
+const lanks = ( async () =>
+  Promise.all([
+      { short: 'ex', long: 'https://example1.com' },
+      { short: 'example', long: 'https://example2.com' },
+      { short: 'short', long: 'https://long-link-example.com' },
+      await link.create({long: 'https://long-link-example.com'})
+    ].map(l=>link.create(l))
+  ) 
+)()
 
 describe('Using a Test Harness', () => {
   beforeAll(async () => {
@@ -51,12 +54,14 @@ describe('Using a Test Harness', () => {
     const { short } = links[0]
     const l = await link.get({ short })
 
+    // console.log({l, l0: links[0]})
+
     expect(l).toHaveProperty('short')
     expect(l).toHaveProperty('long')
     expect(l).toHaveProperty('cts')
     expect(l).toHaveProperty('mts')
     expect(l).toHaveProperty('isDynamic')
-    expect(l).toHaveProperty('ownwerUacct')
+    expect(l).toHaveProperty('ownerUacct')
   })
 
   test('Already Used Vanity URL Test', async () => {
@@ -75,7 +80,7 @@ describe('Using a Test Harness', () => {
     expect(l2).toHaveProperty('cts')
     expect(l2).toHaveProperty('mts')
     expect(l2).toHaveProperty('isDynamic')
-    expect(l2).toHaveProperty('ownwerUacct')
+    expect(l2).toHaveProperty('ownerUacct')
   })
 
   test('Make a Dynamic URL', async () => {
@@ -111,16 +116,18 @@ describe('Using a Test Harness', () => {
       ])
     })
 
+    // console.log(linky)
+
     await link.ent.put(linky)
     const l = await link.get({short: linky.short})
 
-    expect(l.short).not.toEqual('ex')
+    expect(l.short).not.toEqual('ex') // since it already exists
     expect(l).toHaveProperty('short')
     expect(l).toHaveProperty('long')
     expect(l).toHaveProperty('cts')
     expect(l).toHaveProperty('mts')
     expect(l).toHaveProperty('isDynamic')
-    expect(l).toHaveProperty('ownwerUacct')
+    expect(l).toHaveProperty('ownerUacct')
     expect(l).toHaveProperty('dynamicConfig')
   })
 

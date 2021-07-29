@@ -10,13 +10,10 @@ export interface ValidationResp{
   docRef?: string
   expensiveData?: {[key:string]:unknown}
 }
+
 // the plain 'true' values are for conditional logic where one branch of a conditional passes - and the other side does not
 // this way the passing side can return true
 export type ValidationTest<T> = (event:Evt, context: Ctx, authZData: T) => Promise<ValidationResp | true>
-
-const hasNoErrors = <T, U>(input:T | {}, errorList:U[]): input is Required<NonNullObj<T>> => {
-  return errorList.length === 0
-}
 
 /**
  * @notes feels like it needs two types, the dirty input, and clearned normalized output
@@ -28,10 +25,13 @@ const hasNoErrors = <T, U>(input:T | {}, errorList:U[]): input is Required<NonNu
  * @param tests
  * @returns
  */
-export const validate = <T>(responder: Responder<Required<NonNullObj<T>>>, preValidationData: T, ...tests:ValidationTest<Partial<T>>[]) : IFunc =>
-  async (event, context) => {
-    const allFuncResp = (
-      await Promise.all(
+export const validate = <T>(responder: Responder<Required<NonNullObj<T>>>, preValidationData: T, ...tests:ValidationTest<Partial<T>>[]) : IFunc => {
+  const hasNoErrors = <T, U>(input:T | {}, errorList:U[]): input is Required<NonNullObj<T>> => {
+    return errorList.length === 0
+  }
+
+  return async (event, context) => {
+    const allFuncResp = ( await Promise.all(
         tests.map(async (t) => t(event, context, preValidationData))
       ).catch(er => [{
         code: 400,
@@ -64,5 +64,6 @@ export const validate = <T>(responder: Responder<Required<NonNullObj<T>>>, preVa
       } as SRet
     }
   }
+}
 
 export default validate

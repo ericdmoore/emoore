@@ -36,6 +36,15 @@ export interface JWTObjectInput{
     maxl25: string[]
     uacct?: string
 }
+
+export interface MetaResp {
+    _meta:{
+        self: { url: string; cur: string }
+        next: { url: string; cur: string }
+        prev: { url: string; cur: string }
+    }
+}
+
 export interface JWTObjectOutput extends JWTelementsExtras{
     iat: number
     exp: number

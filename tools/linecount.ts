@@ -1,7 +1,6 @@
 // npx ts-node tools/linecount.ts 
 import type {PlotConfig} from 'asciichart'
-
-import {readFile} from 'fs'
+import {readFile, createWriteStream, WriteStream} from 'fs'
 import {resolve} from 'path'
 import {promisify} from 'util'
 
@@ -41,7 +40,8 @@ options.usingDashedFiles = options._.length > 0
 const readFileP = promisify(readFile)
 const asc = (smallest:number, highest:number) => smallest - highest
 const desc = (smallest:number, highest:number) =>  highest - smallest
-
+const FILELOC = './lastLineCountData.json'
+const FILEPATH = resolve(__dirname, FILELOC)
 /** 
  * This bin naked numbers
  * @question should we add a ƒn for binning named numbers?
@@ -172,6 +172,15 @@ const histogramPlot = (title:string, series:number[], bins:IBinConfig = {count:1
     )
 }
 
+const compareRuns = (comparisonMeta:{title:string},series1:Dict<number>, series2:Dict<number>)=>{
+    console.log('Comparison: ',comparisonMeta.title)
+    console.log('need to implement comparison')
+}
+
+const writeToFile = async (ws:WriteStream, data:object | string)=>new Promise((resolve, reject)=>{
+    ws.on('close', resolve).write(JSON.stringify(data, null, 2))
+})
+
 ;(async ()=>{
     if(options.help){
         console.log(`
@@ -230,6 +239,14 @@ const histogramPlot = (title:string, series:number[], bins:IBinConfig = {count:1
             makeBoxPlot(charCounts)
             histogramPlot('---------------\nChar Hist\n', charCounts, {count:25}, {height:6})
         }
+
+
+        const lastRunData = JSON.parse((await readFileP(FILEPATH)).toString())
+        await compareRuns({title:'Lines'} , fileLineCount, lastRunData.fileLineCount as Dict<number>)
+        await compareRuns({title:'Chars'} , fileCharCount, lastRunData.fileCharCount as Dict<number>)
+        
+        await writeToFile( createWriteStream(FILEPATH,{emitClose:true}), { fileCharCount, fileLineCount})
+
     }
 })()
 

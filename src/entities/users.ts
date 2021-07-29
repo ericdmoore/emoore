@@ -153,14 +153,8 @@ export const user = {
       backupCodes,
       pwHash
     })
-
-    await userLookup.ent.put({
-      uacct,
-      exID: email,
-      typeID: 'email',
-      isIDVerified: false
-    })
-
+    await user.addExternalID(uacct, 'email',email)
+    
     return {
       uacct,
       email,
@@ -170,6 +164,22 @@ export const user = {
       pwHash,
       // delegation
     }
+  },
+  batch:{
+    put : async (...userList:{
+      email: string, 
+      uacct: string, 
+      displayName:string, 
+      plaintextPassword: string}[])=>{
+        return Promise.all(
+          userList.map(u=>user.genUser(
+            u.email,
+            u.plaintextPassword,
+            u.uacct,
+            u.displayName
+          ))
+        )
+    },
   },
   password: {
     /**

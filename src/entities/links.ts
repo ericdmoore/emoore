@@ -18,10 +18,16 @@ export const link = {
   pk: (data:{short:string}) => `l#${data.short}`,
   sk: (data:{short:string}) => `l#${data.short}`,
   get: (i:{short:string}) => link.ent.get(i).then(d=> d.Item),
+  /**
+   * ## Create Link 
+   * with proper structure but it does not save the ILink
+   * will need to save the link to the Link table space after creation
+   * @param linkInputs 
+   */
   create : async (linkInputs:CreateLinkInput):Promise<ILink>=>({
     ...linkInputs,
-    ownerUacct: 'ericdmoore',
-    isDynamic: linkInputs.isDynamic ?? false,
+    ownerUacct: linkInputs.ownerUacct ?? 'ericdmoore',
+    isDynamic: !!linkInputs.dynamicConfig ?? false,
     short: await link.ensureVanityAvail(linkInputs.short)
   }),
   ensureVanityAvail: async (short?:string, tries = 1, tryLen = 4):Promise<string> => {
@@ -63,20 +69,24 @@ export const link = {
       ) as DocumentClient.BatchGetItemOutput
       return Object.values(batchGet.Responses ?? {}).flat(1) as ILink[]
     },
+    put: async(...links:ILink[])=>{
+      await appTable.batchWrite(links.map(l=>link.ent.putBatch(l)))
+      return links
+    },
   },
   ent: new Entity({
     table: appTable,
     name: 'link',
     timestamps: false,
     attributes: customTimeStamps({
-      // pk
+      // pk + sk
       short: { type: 'string' },
-      // sk + required
+      // required
       long: { type: 'string', required: true },
       isDynamic: {type:'boolean', default: false },
       ownerUacct: { type: 'string', required: true, default:'ericdmoore' },
       //
-      og: { type: 'map' },
+      metatags: { type: 'map' },
       tags: { type: 'map' },
       params: { type: 'map' },
       dynamicConfig: {type:'map'},
@@ -86,25 +96,24 @@ export const link = {
   })
 }
 
-
-
 export interface CreateLinkInput{
   long: string
+  short?: string
   ownerUacct?:string
-  short?: string    
-  isDynamic?:boolean
-  og?: Dict<string> 
+
+  metatags?: Dict<string> 
   tags?: Dict<string>
   params?: Dict<string>
   dynamicConfig?: DynamicKind
 }
 
 export interface ILink{
-  short: string
   long: string
+  short: string
   isDynamic: boolean
   ownerUacct: string
-  og?: Dict<string>
+  
+  metatags?: Dict<string>
   tags?: Dict<string>
   params?: Dict<string>
   dynamicConfig?: DynamicKind

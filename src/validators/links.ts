@@ -1,6 +1,7 @@
 import type { IFunc, Responder, SRet, Evt } from '../types'
 import type {ValidationTest, ValidationResp} from '../funcs/validations'
 import type {
+  CreateLinkInput,
   DynamicKind,
   DynamicRotate,
   DynamicExpires,
@@ -8,124 +9,212 @@ import type {
   DynamicGeo,
   DynamicKeepAlive,
 } from '../entities/links'
-
+import compose, { mergeErrors } from './helpers/composeValidator'
 import {URL} from 'url'
 import JSON5 from 'json5'
 import * as t from 'io-ts'
+import {isRight} from 'fp-ts/lib/Either'
+import {
+  authTokenShouldBeProvided, 
+  authTokenShouldBeValid
+} from './tokens'
+import { possible } from '../utils/codecs'
 import pluckDataFor from '../utils/pluckData'
-import {authTokenShouldBeProvided, authTokenShouldBeValid} from './tokens'
-import {possible} from '../utils/codecs'
+import {link} from '../entities'
 
 // #region helpers
+
 const JSONParse = (input:string)=>{
   try{ return {er:null, data: JSON.parse(input)} }
-  catch(er){ return {er, data:null} }
+  catch(er:unknown){ return {er: er as Error, data:null} }
 }
 
-const makesURLError = (s:string)=>{
-  try{ const u = new URL(s, 'https://emoo.re'); return false}
+const makesURLError = (shortPath:string)=>{
+  try{ const u = new URL(shortPath, 'https://emoo.re'); return false}
   catch(er){ return true }
-}
-
-const joinAndShowFails = (element:keyof ValidationResp, ...validations: ValidationResp[])=>{
-  return validations.filter(v=>!v.passed).map(v=> v[element]).join(', ')
 }
 
 export const pluckPaths = (whereToLook:string) => (e:Evt): unknown => {
   const paths = pluckDataFor(whereToLook)(e, '[]' as string)
-  return JSON5.parse(paths, function(key, val){
+  return JSON5.parse(paths, function(_, val){
     return typeof val ==='string' 
       ? decodeURIComponent(val)
       : val
   })
 } 
 
-const allHaveScheme = (urls:string[]) => 
-    urls.every((long) => 
-       long.startsWith('http://') 
-    || long.startsWith('https://'))
-
+const allHaveScheme = (urls:(string| CreateLinkInput)[]) => {
+  return urls.every((long) => {
+    const l = typeof long ==='string' ? long : long.long
+    return l.startsWith('http://')  || l.startsWith('https://')
+  }) 
+}
 
 // #endregion helpers
 
 // #region plucker
+
 export const pluckShortPaths = pluckPaths('shortpaths')
 export const pluckLongPaths = pluckPaths('longpaths')
+
 // #endregion plucker
 
 // #region validators
 
-export const linksOrUacctAreProvided: ValidationTest<unknown> = async (e, c, d) => {
+export const allShortLinksAreValid: ValidationTest<unknown> = async (e, c, d) => {
+  const paths = (pluckPaths('shortpaths')(e) as (string | {short:string, long?:string} )[])
+  .map(l => typeof l ==='string' ? l : l.short)
   
-  const hasLInks = await linksAreProvided(e,c,d)
-    .then(passed => typeof passed === 'boolean' ? {passed} : passed) as ValidationResp
-  
-  const hasAuthToken = await authTokenShouldBeProvided(e,c,d)
-    .then(passed => typeof passed === 'boolean' ? {passed} : passed) as ValidationResp
-  
-  const authTokenIsValid = await authTokenShouldBeValid(e,c,d)
-    .then(passed => typeof passed === 'boolean' ? {passed} : passed) as ValidationResp
-  
-  // console.log({ c1, c2, c3 })
+  return {
+    code: 400,
+    reason: 'Not all shortpath/URL segments provided are able to construct a valid URL',
+    passed:  paths.every(short => !makesURLError(short)) , 
+    InvalidDataLoc: '',
+    InvalidDataVal: '',
+    docRef: ''
+  }
+}
+
+export const linkBatchSize = (pathToCheck:'longpaths'|'shortpaths'): ValidationTest<unknown> => async (e, c, d) => {
+  const paths = (pluckPaths(pathToCheck)(e) as (string | CreateLinkInput )[])
+    .map(long => typeof long ==='string' ? {long} : long)
+  const numPaths = paths.length
+  return {
+    code: 400,
+    reason: 'Link batches must be smaller than 25, and larger than 0',
+    passed: 0 < numPaths && numPaths <= 25,
+    InvalidDataLoc: '',
+    InvalidDataVal: '',
+    docRef: ''
+  }
+}
+
+export const allLinksHaveAScheme = (pathToLook:'longpaths'): ValidationTest<unknown> => async (e, c, d) => {
+  const paths = (pluckPaths(pathToLook)(e) as (string | CreateLinkInput )[])
+    .map(long => typeof long ==='string' ? {long} : long)
+  return {
+    code: 400,
+    reason: 'All links must have a schema/protocol',
+    passed: allHaveScheme(paths),
+    InvalidDataLoc: '',
+    InvalidDataVal: '',
+    docRef: ''
+  }
+}
+
+export const allLinkInputsHaveCorrectStructure = (pathToCheck:'longpaths'):ValidationTest<unknown> => async (e, c, d) => {  
+  const paths = (pluckPaths(pathToCheck)(e) as (string | CreateLinkInput )[])
+    .map(long => typeof long ==='string' ? {long} : long)
 
   return {
     code: 400,
-    passed: hasLInks.passed && hasAuthToken.passed && authTokenIsValid.passed,
-    reason: joinAndShowFails('reason', hasLInks, hasAuthToken, authTokenIsValid),
-    InvalidDataLoc: joinAndShowFails('InvalidDataLoc', hasLInks, hasAuthToken, authTokenIsValid),
-    InvalidDataVal: joinAndShowFails('InvalidDataVal', hasLInks, hasAuthToken, authTokenIsValid),
-    docRef: joinAndShowFails('docRef', hasLInks, hasAuthToken, authTokenIsValid),
+    reason: 'All Long links must be a `string | {long: string, short?:string}`',
+    passed: paths.every((u)=>{
+      return isRight(incomingLongLink.decode(u))
+    })
   }
 }
 
 export const linksAreProvided: ValidationTest<unknown> = async (e, c, d) => {
   if(e.requestContext.http.method.toUpperCase() ==='POST'){
-    return allLongLinksAreValid(e,c,d)
+    const errs = await compose(
+      allLinkInputsHaveCorrectStructure('longpaths'),
+      allLinksHaveAScheme('longpaths'),
+      linkBatchSize('longpaths')
+    )(e,c)
+    return errs ? mergeErrors(...errs) : true
   }else{
+    const errs = await compose(
+      linkBatchSize('shortpaths')
+    )(e,c)
+    // return errs ? mergeErrors(...errs) : true
     return allShortLinksAreValid(e,c,d)
   }
 }
 
-const allShortLinksAreValid: ValidationTest<unknown> = async (e, c, d) => {
-  const paths = (pluckShortPaths(e) as (string | {short:string, long?:string} )[])
-  .map(l => typeof l ==='string' ? l : l.short)
-  
-  const passed = paths.length === 
-      paths.map(short => !makesURLError(short))
-      .filter(v => v)
-      .length 
 
-  return {
-    code: 400,
-    reason: 'All Short URL segments need to be able to construct a valid URL',
-    passed: paths.length <= 25 && passed , // no above zero check since we might just query on uacct
-    InvalidDataLoc: '',
-    InvalidDataVal: '',
-    docRef: ''
-  }
-}
+export const updateCommandIsValid = (keyForVerifedData ='verifiedUpdateCmd'):ValidationTest<unknown> => async (e,c,d)=>{ 
+  const updateStr = pluckDataFor('update')(e, null)
+  if(!updateStr){
+    return {
+      code:400,
+      passed: false,
+      reason:'Missing stringified update map command',
+      InvalidDataLoc:'[H>Q>C].update',
+      InvalidDataVal:'missing!',
+    }
+  }else{
+    if(updateStr.length > 10_000){
+      return {
+        code:400,
+        passed: false,
+        reason:'Update Command JSONString exceeded the maxiumum permitted value, consider breaking up the update map',
+        InvalidDataLoc:'[H>Q>C].update',
+        InvalidDataVal:'Too Large!',
+      }
+    }
+    const {er, data} = JSONParse(updateStr)
+    if(er){
+      return {
+        code:400,
+        passed: false,
+        reason:`Stringified update command was not parsable JSON ${er}`,
+        InvalidDataLoc:'[H>Q>C].update',
+        InvalidDataVal:data,
+      }
+    }
+    else{
+      const entries = Object.entries(data)
+      if(entries.length>25){
+        return {
+          code:400,
+          passed: false,
+          reason: 'The Update Command map must have 24 or less entries',
+          InvalidDataLoc:'[H>Q>C].update',
+          InvalidDataVal:JSON.stringify(entries),
+        } 
+      }else{
+        const passed = entries.every(([_,v])=>isRight(updateCommandCodec.decode(v)))
 
-const allLongLinksAreValid: ValidationTest<unknown> = async (e, c, d) => {
-  
-  const paths = (pluckLongPaths(e) as (string | {short?:string, long:string} )[])
-    .map(s => typeof s ==='string' ? s : s.long)
-
-  const numPaths = paths.length
-  return {
-    code: 400,
-    reason: 'All Long links must have a schema/protocol',
-    passed: numPaths>0 && numPaths<= 25 && allHaveScheme(paths),
-    InvalidDataLoc: '',
-    InvalidDataVal: '',
-    docRef: ''
+        if(passed){
+          const r = await link.batch.get(entries.map(([k,v])=>({ short: k }) ))
+          // validate all keys
+          if(r.length === entries.length){
+            // console.log('All Validations Pass')
+            return {
+              code: 400,
+              passed: true,
+              reason: 'All short path entry keys must already existing in order to be updated',
+              InvalidDataLoc:'[H>Q>C].update',
+              InvalidDataVal: JSON.stringify(entries),
+              expensiveData:{ [keyForVerifedData]: Object.fromEntries(entries)}
+            }
+          } else{
+            return {
+              code: 400,
+              passed: false,
+              reason: 'All short path entry keys must already existing in order to be updated',
+              InvalidDataLoc:'[H>Q>C].update',
+              InvalidDataVal: JSON.stringify(entries),
+            }
+          }
+        } else{ 
+          return {
+            code:400,
+            passed,
+            reason: 'All entries in the command map must have valid syntax',
+            InvalidDataLoc:'[H>Q>C].update',
+            InvalidDataVal: JSON.stringify(entries),
+          }
+        }
+      }
+    }
   }
 }
 
 // #endregion validators
 
-
 // #region codecs
-
 
 const dyanmicKindRotate : t.Type<DynamicRotate> = t.recursion(
   'DynamicRotate',
@@ -177,7 +266,7 @@ const dyanmicExpires: t.Type<DynamicExpires> = t.recursion(
   })
 )
 
-export const allDynamics: t.Type<AllDynamics> = t.recursion(
+export const allDynamics: t.Type<DynamicKind> = t.recursion(
   'AllDynamics', 
   () => t.union([
     dyanmicKindGeo,
@@ -188,28 +277,38 @@ export const allDynamics: t.Type<AllDynamics> = t.recursion(
   ])
 )
 
+
+
+// const ogPrefixes = Object.values(openGraph).map(val=>t.literal(val))
+// const [ogPrefixTitle, ogPrefixUrl]  = ogPrefixes.slice(0,2)
+// const ogPrefixRest  = ogPrefixes.slice(2)
+
 export const incomingLongLinkFullKind = t.type({
   long: t.string,
   short: possible(t.string),
   dynamicConfig: possible(allDynamics),
   ownerUacct: possible(t.string),
   isDynamic: possible(t.boolean),
-  og: possible(t.UnknownRecord),
-  tags: possible(t.UnknownRecord),
-  params: possible(t.UnknownRecord),
-  // 
-  // to change from unknonw Record to structured recordnpm i 
-  // but change the first t.string to be a t.union([ t.literal('k1'),  t.literal('k2')]) 
-  // params: possible(t.record(t.string, t.string)),
+
+  // og + twitter card preview data
+  metatags: possible(t.record(t.string, t.string)),
+
+  // internal campaign tags
+  tags: possible(t.record(t.string, t.string)),
+  
+  // URL param white list to pass along
+  params: possible(t.record(t.string, t.string))
 })
 
 const incomingLongLinkShorthand = t.string
 export const incomingLongLink = t.union([incomingLongLinkShorthand, incomingLongLinkFullKind])
 
+const updateCommandCodec = t.type({
+  long: possible(t.string),
+  tags: possible(t.record(t.string, t.string)),
+  params: possible(t.record(t.string, t.string)),
+  metatags: possible(t.record(t.string, t.string)),
+  dynamicConfig: possible(allDynamics),
+})
+
 // #endregion codecs
-
-// #region interfaces
-type AllDynamics = DynamicKind
-
-
-// #endregion interfaces

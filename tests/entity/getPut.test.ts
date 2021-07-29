@@ -16,7 +16,7 @@ beforeAll(async () => {
       short: 'ddg',
       long: 'https://ddg.co',
       ownerUacct: 'ericdmoore',
-      og: {
+      metatags: {
         'og:title': 'DuckDuckGo',
         'og:image': 'https://duckduckgo.com/assets/logo_homepage.normal.v108.svg',
         'og:image:type': 'image/svg',
