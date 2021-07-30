@@ -3,12 +3,13 @@ import { appTable, link, userAccess } from '../entities'
 import {jwtVerify} from '../auths/validJWT'
 import type { ILink, DynamicKind} from '../entities/links'
 import baseHandle from '../utils/methodsHandler'
-import * as t from 'io-ts'
-import {possible} from '../utils/codecs'
-import {allDynamics} from '../validators/links'
+// import * as t from 'io-ts'
+// import {possible} from '../utils/codecs'
+// import {allDynamics} from '../validators/links'
 // import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
 // import { getJWTobject } from '../auths/validJWT'
 // import JSON5 from 'json5'
+import type {ValidationResp} from '../funcs/validations'
 import { respSelector, jsonResp }from '../utils/SRetFormat'
 
 import validate from './validations'
@@ -20,16 +21,13 @@ import {
   allLinksHaveAScheme,
   allShortLinksAreValid,
   linkBatchSize,
-  updateCommandIsValid
+  updateCommandIsValid,
+  shortLinksAreStrings
 } from '../validators/links'
 import pluckDataFor from '../utils/pluckData'
-import { verify } from 'jsonwebtoken'
+import { rightReader } from 'fp-ts/lib/StateReaderTaskEither'
 
 const compressableJson = respSelector(jsonResp)
-
-// #region interfaces
-
-// #endregion interfaces
 
 export const validedGET:IFunc = async (event, ctx) => {
   const paths = pluckShortPaths(event) as (string | {short:string, long?:string})[]
@@ -159,21 +157,57 @@ export const putResponder:Responder<{}> = async (data, e, ctx, extras) => {
 }
 
 export const validatedDELE:IFunc = async (event, ctx) => {
+  
   return validate(
-    postResponder, 
+    deleResponder, 
     {}, 
     authTokenShouldBeProvided, 
-    authTokenShouldBeValid
+    authTokenShouldBeValid,
+    shortLinksAreStrings('linkBatch')
   )(event, ctx)
 }
 
-export const deleResponder:Responder<{}> = async (data, event, ctx) => {
-  //
-  await link.ent.delete()
-  return {
-    statusCode:200,
-    ...await compressableJson()(event, {event})
-  }
+export const deleResponder:Responder<{}> = async (data, event, ctx, extras) => {
+  const batchedLinks =  extras['linkBatch'] as ILink[]
+  const tok = await jwtVerify()(
+    pluckDataFor('token')(event,'alreadyEnsured')
+  ) as {uacct:string}
+
+  console.log({tok, batchedLinks})
+
+  if(batchedLinks.every(l=> l.ownerUacct === tok.uacct)){
+    console.log('all properly owned')
+
+    const r = await appTable.batchWrite(
+      batchedLinks.map(({short}) => link.ent.deleteBatch({short})),
+      {metrics:'SIZE'}
+    )
+    
+    console.log(r)
+
+    return {
+      statusCode:200,
+      ...await compressableJson()(event, {
+        deleted: batchedLinks.map(l=>l.short)
+      })
+    }
+  }else{
+    return {
+      statusCode:400,
+      ...await compressableJson()(event, {
+        errors:[
+          {
+            code:400,
+            passed: false,
+            reason:'Delete Command can only delete links owned by the uacct represented via the token',
+            InvalidDataLoc:'[H>Q>C].del',
+            InvalidDataVal:'',
+            docRef:''
+          } as ValidationResp
+        ]
+      })
+    }
+  }  
 }
 
 export const get: IFunc = validedGET

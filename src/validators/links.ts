@@ -8,6 +8,7 @@ import type {
   DynamicHurdle,
   DynamicGeo,
   DynamicKeepAlive,
+  ILink
 } from '../entities/links'
 import compose, { mergeErrors } from './helpers/composeValidator'
 import {URL} from 'url'
@@ -211,6 +212,32 @@ export const updateCommandIsValid = (keyForVerifedData ='verifiedUpdateCmd'):Val
     }
   }
 }
+
+export const shortLinksAreStrings = (keyForExpData = 'linkBatch'): ValidationTest<unknown> => async (e,c,d)=>{
+  const deleCmd = JSON.parse(pluckDataFor('del')(e,'null')) as string[] | null
+  let links: ILink[] = []
+
+  if(deleCmd){
+    links = await link.batch.get(deleCmd.map(short=>({short})))
+  }
+
+  const passed = deleCmd!== null 
+      && deleCmd.length === links.length
+      && deleCmd.length <= 25
+      && isRight(t.array(t.string).decode(deleCmd))
+  
+  // console.log({deleCmd, links, passed})
+
+  return {
+    code: 400,
+    passed,
+    reason: 'The delete comand should be an array of strings thats less than 25 long',
+    InvalidDataLoc: '[H>Q>C].del',
+    InvalidDataVal: (deleCmd ?? 'null').toString(),
+    expensiveData: {[keyForExpData]: links} 
+  } 
+}
+
 
 // #endregion validators
 

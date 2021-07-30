@@ -50,6 +50,7 @@ const preLoadUsers = [
 
 // Declaring 
 const userEric3Links = preLoadUsers[0]
+const userDeletesStuff = preLoadUsers[1]
 const userMolly1Link = preLoadUsers[2]
 
 export const lanks = (() => Promise.all([
@@ -77,8 +78,22 @@ export const lanks = (() => Promise.all([
     long:'https://ericdmoore.com',
     ownerUacct: userMolly1Link.uacct
   }),
+  link.create({ 
+    short:'deleteMe1',
+    long:'https://ericdmoore.com',
+    ownerUacct: userDeletesStuff.uacct
+  }),
+  link.create({ 
+    short:'deleteMe2',
+    long:'https://ericdmoore.com',
+    ownerUacct: userDeletesStuff.uacct
+  }),
+  link.create({ 
+    short:'deleteMe3',
+    long:'https://ericdmoore.com',
+    ownerUacct: userDeletesStuff.uacct
+  }),
 ]))()
-
 
 beforeAll(async () => {
   // setup links
@@ -454,8 +469,146 @@ describe('PUT /links', () => {
   })
 })
 
-describe.skip('DELETE /links', () => {
+describe('DELETE /links', () => {
   const evt = event('DELETE', '/links')
-  test.todo('Delete a short link')
-  test.todo('Delete a short link batch')
+
+  test('Delete a short link', async () => {
+    const token  = await jwtSign()({ 
+      uacct: userDeletesStuff.uacct, 
+      maxl25:[], 
+      email:'doesNotMatterForThisTest' 
+    })
+    const e:Evt = {
+      ...evt,
+      headers:{
+        token, 
+        del: JSON.stringify(['deleteMe1'])
+      }
+    }
+
+    const resp = await handler(e, ctx) as SRet
+    const {er, data} = JSONParse(resp?.body ?? '{}')
+    const body = data as {deleted: string[]}
+
+    expect(er).toBeFalsy()
+    expect(resp).toHaveProperty('statusCode',200)
+    expect(resp).toHaveProperty('isBase64Encoded',false)
+    expect(resp).toHaveProperty('body')
+    expect(body).toHaveProperty('deleted')
+    expect(body.deleted).toHaveLength(1)
+
+  })
+
+  test('Delete a short link batch', async()=>{
+    const token  = await jwtSign()({ 
+      uacct: userDeletesStuff.uacct, 
+      maxl25:[], 
+      email:'doesNotMatterForThisTest' 
+    })
+    const e:Evt = {
+      ...evt,
+      headers:{
+        token, 
+        del: JSON.stringify(['deleteMe2', 'deleteMe3'])
+      }
+    }
+
+    const resp = await handler(e, ctx) as SRet
+    const {er, data} = JSONParse(resp?.body ?? '{}')
+    const body = data as {deleted: string[]}
+    
+    console.log(body)
+
+    expect(er).toBeFalsy()
+    expect(resp).toHaveProperty('statusCode',200)
+    expect(resp).toHaveProperty('isBase64Encoded',false)
+    expect(resp).toHaveProperty('body')
+    expect(body).toHaveProperty('deleted')
+    expect(body.deleted).toHaveLength(2)
+
+  })
+
+  test('Can not delete invalid short links', async () => {
+    const token  = await jwtSign()({ 
+      uacct: userDeletesStuff.uacct, 
+      maxl25:[], 
+      email:'doesNotMatterForThisTest' 
+    })
+    const e:Evt = {
+      ...evt,
+      headers:{
+        token, 
+        del: JSON.stringify(['lamb1'])
+      }
+    }
+
+    const resp = await handler(e, ctx) as SRet
+    const {er, data} = JSONParse(resp?.body ?? '{}')
+    const body = data as any
+
+    expect(er).toBeFalsy()
+    expect(resp).toHaveProperty('statusCode',400)
+    expect(resp).toHaveProperty('isBase64Encoded',false)
+    expect(resp).toHaveProperty('body')
+    expect(body).toHaveProperty('errors')
+
+  })
+
+  test('Can not delete more than 25 short links', async () => {
+    const token  = await jwtSign()({ 
+      uacct: userDeletesStuff.uacct, 
+      maxl25:[], 
+      email:'doesNotMatterForThisTest' 
+    })
+    const e:Evt = {
+      ...evt,
+      headers:{
+        token, 
+        del: JSON.stringify([
+          'l1','l2','l3','l4','l5','l6',
+          'l7','l8','l9','l10','l11','l12',
+          'l13','l14','l15','l16','l17','l18',
+          'l19','l20','l21','l22','l23','l24',
+          'l25','l26'
+        ])
+      }
+    }
+
+    const resp = await handler(e, ctx) as SRet
+    const {er, data} = JSONParse(resp?.body ?? '{}')
+    const body = data as any
+
+    expect(er).toBeFalsy()
+    expect(resp).toHaveProperty('statusCode',400)
+    expect(resp).toHaveProperty('isBase64Encoded',false)
+    expect(resp).toHaveProperty('body')
+    expect(body).toHaveProperty('errors')
+
+  })
+
+  test('Error for deleting un-owned links ', async () => {
+    const token  = await jwtSign()({ 
+      uacct: userMolly1Link.uacct, 
+      maxl25:[], 
+      email:'doesNotMatterForThisTest' 
+    })
+    const e:Evt = {
+      ...evt,
+      headers:{
+        token, 
+        del: JSON.stringify(['im'])
+      }
+    }
+
+    const resp = await handler(e, ctx) as SRet
+    const {er, data} = JSONParse(resp?.body ?? '{}')
+    const body = data
+
+    expect(er).toBeFalsy()
+    expect(resp).toHaveProperty('statusCode',400)
+    expect(resp).toHaveProperty('isBase64Encoded',false)
+    expect(resp).toHaveProperty('body')
+    expect(body).toHaveProperty('errors')
+  })
+
 })
