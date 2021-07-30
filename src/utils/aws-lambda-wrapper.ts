@@ -48,8 +48,7 @@ export const runOnLambda = (_cfg:LambdaConfiguration) => {
             }
    
            if(!!funcsForAccount && !funcsForAccount.some(fn => fn.FunctionName === fnName)){
-                console.error(`Function Requested: ${fnName}`) 
-                console.error(` Can not be found in ${funcsForAccount.map(f=>f.FunctionName)}`)
+                console.error(`Function Requested: ${fnName} -  cannot be found within ${JSON.stringify(funcsForAccount.map(f=>f.FunctionName))}`)
                 
                 const err = Error()
                 err.name = 'Given Function Not Found'

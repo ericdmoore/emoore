@@ -517,7 +517,7 @@ describe('DELETE /links', () => {
     const {er, data} = JSONParse(resp?.body ?? '{}')
     const body = data as {deleted: string[]}
     
-    console.log(body)
+    // console.log(body)
 
     expect(er).toBeFalsy()
     expect(resp).toHaveProperty('statusCode',200)

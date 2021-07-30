@@ -10,7 +10,7 @@ import type {
 } from 'aws-lambda'
 
 import JSON5 from 'json5'
-import { ApolloServer, gql } from 'apollo-server-express'
+// import { ApolloServer, gql } from 'apollo-server-express'
 import { schemaFromGlobs } from '../merged'
 
 // in order for esbuild to properly bundle
@@ -22,19 +22,20 @@ import { schemaFromGlobs } from '../merged'
 // cut them into some runtime module resolution - ;|
 
 export const handler: Func = async (event, context) => {
-  const server = new ApolloServer({
-    typeDefs: gql(await schemaFromGlobs()),
-    resolvers: {},
-    playground: true
-  })
+  // const server = new ApolloServer({
+  //   typeDefs: gql(await schemaFromGlobs()),
+  //   resolvers: {},
+  //   playground: true
+  // })
   const payload = JSON5.parse(event.body || '{}')
   // eslint-disable-next-line no-unused-vars
 
-  return server.executeOperation({
-    query: event.pathParameters?.query ?? payload?.query ?? '{ me { name } }',
-    operationName: payload?.operationName,
-    variables: payload?.variables
-  }).catch(console.error) as Ret
+  return payload 
+  // return server.executeOperation({
+  //   query: event.pathParameters?.query ?? payload?.query ?? '{ me { name } }',
+  //   operationName: payload?.operationName,
+  //   variables: payload?.variables
+  // }).catch(console.error) as Ret
 }
 
 export default handler

@@ -173,17 +173,15 @@ export const deleResponder:Responder<{}> = async (data, event, ctx, extras) => {
     pluckDataFor('token')(event,'alreadyEnsured')
   ) as {uacct:string}
 
-  console.log({tok, batchedLinks})
-
   if(batchedLinks.every(l=> l.ownerUacct === tok.uacct)){
-    console.log('all properly owned')
+    // console.log('all properly owned')
 
     const r = await appTable.batchWrite(
       batchedLinks.map(({short}) => link.ent.deleteBatch({short})),
       {metrics:'SIZE'}
     )
     
-    console.log(r)
+    // console.log(r)
 
     return {
       statusCode:200,
