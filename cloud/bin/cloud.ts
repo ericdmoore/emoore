@@ -87,7 +87,7 @@ clicks
   })
   api.mergeRouteFunctions(fns)
 
-  cdkStack.table.grantReadWriteData(funcMap.graphql)
+  // cdkStack.table.grantReadWriteData(funcMap.graphql)
 
   new cdk.CfnOutput(cdkStack, 'api-url', {
     exportName: 'api-url',
