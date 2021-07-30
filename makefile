@@ -27,7 +27,7 @@ build: build-code build-cloud
 	@echo Built Application Code And Cloud Comps
 
 cloud-install: 
-	cd cloud; npm i
+	cd cloud; npm ci
 
 deploy:
 	cd cloud; pwd; npm run cdk deploy
