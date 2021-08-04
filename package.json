@@ -10,6 +10,7 @@
   },
   "scripts": {
     "test": "make test",
+    "ls": "make list",
     "cdk:build": "cd cloud && npm run cdk -- synthesize",
     "schema:gen": "make schema-gen",
     "schema:lint": "make schema-lint",
@@ -38,6 +39,7 @@
     "@types/mime": "^1.3.2",
     "@types/node": "^15.12.2",
     "@types/qrcode": "^1.4.0",
+    "@types/ua-parser-js": "^0.7.36",
     "@typescript-eslint/eslint-plugin": "^4.28.0",
     "@typescript-eslint/parser": "^4.28.0",
     "ascii-boxplot": "^1.2.0",
@@ -79,6 +81,7 @@
     "benchmark": "^2.1.4",
     "dotenv": "^8.2.0",
     "dynamodb-toolbox": "^0.3.3",
+    "fast-geoip": "^1.1.31",
     "fp-ts": "^2.10.5",
     "globby": "^11.0.1",
     "hi-base32": "^0.5.1",
@@ -89,7 +92,8 @@
     "mime": "^1.6.0",
     "nanoid": "^3.1.23",
     "otplib": "^12.0.1",
-    "qrcode": "^1.4.4"
+    "qrcode": "^1.4.4",
+    "ua-parser-js": "^0.7.28"
   },
   "unused": {
     "apollo-server": "^2.22.2",

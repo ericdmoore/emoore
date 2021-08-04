@@ -15,14 +15,15 @@ import type { ProjectionAttributes } from 'dynamodb-toolbox/dist/lib/projectionB
 import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import type { Table } from 'dynamodb-toolbox'
 
-export type Responder<T> = (responderAuthzData:T, event: Event, context: Context, someExtraDataFromValidators:{[key:string]:unknown})=> Promise<Ret>
+export type Responder<T> = (responderAuthzData:T, event: Event, context: Context, someExtraDataFromValidators:{[key:string]:unknown})=> Promise<SRet>
 export type TableType<T> = T & { pk:string; sk:string }
 export type WithTimeStamp<T> = T & { cts:number; mts:number }
 export type Evt = Event
 export type Ctx = Context
 export type SRet = APIGatewayProxyStructuredResultV2
 export type IFuncRetValueP = Promise<string | object | SRet| undefined>
-export type IFunc = (event: Event, context: Context & {nextToken?: string, dataPayload?:unknown}) => IFuncRetValueP
+export type IFuncSRetValueP = Promise<SRet>
+export type IFunc = (event: Event, context: Context & {nextToken?: string, dataPayload?:unknown}) => IFuncSRetValueP
 export interface RequestRejection{
     reason: string
     message: string

@@ -1,27 +1,22 @@
-import type { IFunc } from '../types'
-export const handler = (verbFns: {get:IFunc, post:IFunc, put:IFunc, dele:IFunc}):IFunc => async (e, c) => {
-  const method = e.requestContext.http.method.toUpperCase().slice(0, 4)
-
-  switch (method) {
+import type { IFunc, SRet } from '../types'
+export const handler = (verbFns: {
+  get:IFunc, post:IFunc, put:IFunc, dele:IFunc
+}):IFunc => async (e, c) => {
+  switch (e.requestContext.http.method.toUpperCase().slice(0, 4)) {
     case 'GET':
-      // console.log('found a GET method')
-      return verbFns.get(e, c)
+      return verbFns.get(e, c) as Promise<SRet>
 
     case 'PUT':
-      // console.log('found a PUT method')
-      return verbFns.put(e, c)
+      return verbFns.put(e, c) as Promise<SRet>
 
     case 'POST':
-      // console.log('found a POST method')
-      return verbFns.post(e, c)
+      return verbFns.post(e, c) as Promise<SRet>
 
     case 'DELE':
-      // console.log('found a DEL method')
-      return verbFns.dele(e, c)
+      return verbFns.dele(e, c) as Promise<SRet>
 
     default:
-      // console.log('unknown Method - defaulting to GET')
-      return verbFns.get(e, c)
+      return verbFns.get(e, c) as Promise<SRet>
   }
 }
 export default handler

@@ -6,18 +6,19 @@ import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import { appTable, customTimeStamps } from './entities'
 import { Entity } from 'dynamodb-toolbox'
 import { nanoid } from 'nanoid'
-// import base32 from 'hi-base32'
 
 const linkFromStringOrStructured = async (v:BatchCreateElem, i:number, a: BatchCreateElem[]) => {
   return link.ent.putBatch(await link.create(v))
 }
 
-const didFindResult = (result?:any):boolean=> !!result && Object.keys(result).length !== 0
+const isEmpty = (obj :object)=> Object.keys(obj).length === 0 
 
 export const link = {
   pk: (data:{short:string}) => `l#${data.short}`,
   sk: (data:{short:string}) => `l#${data.short}`,
-  get: (i:{short:string}) => link.ent.get(i).then(d=> d.Item),
+  get: (i:{short?:string}) => !!i.short
+    ? link.ent.get(i).then(d=> d.Item) as Promise<ILink>
+    : Promise.reject(Error('Can not look up a link with out the short path identifier')),
   /**
    * ## Create Link 
    * with proper structure but it does not save the ILink
@@ -30,19 +31,26 @@ export const link = {
     isDynamic: !!linkInputs.dynamicConfig ?? false,
     short: await link.ensureVanityAvail(linkInputs.short)
   }),
-  ensureVanityAvail: async (short?:string, tries = 1, tryLen = 4):Promise<string> => {
-    // console.log({short,tries, tryLen})
+  ensureVanityAvail: async (short?:string, tries= 1, tryLen= 4):Promise<string> => {
+    // console.log({ short })
+
     if(short){
-      if(didFindResult(await link.ent.get({short}).catch(er => {return null}))){
-        /* istanbul ignore else */
-        if(tries <= 3){
-          return link.ensureVanityAvail( nanoid(tryLen), tries+1)
-        }else{
-          // lots of tries, so use bigger len
-          return link.ensureVanityAvail( nanoid(tryLen), tries+1, tryLen+1)
-        }
-      }else{        
+      const l = await link.ent.get({short}).catch(er=>null)
+      const goodToGo = !l || isEmpty(l)
+      if(goodToGo){
+        // console.log({ short, l, neededToTryAgain: !goodToGo})
         return short
+      }else{
+        // console.log({ short, l, neededToTryAgain: !goodToGo})
+       // try three times
+       /* istanbul ignore else */
+       if(tries <= 3){
+          // keep trying - switch up the short path
+          return link.ensureVanityAvail(nanoid(tryLen), tries+1)
+        } else {
+          // lots of tries, so use bigger len next time
+          return link.ensureVanityAvail( nanoid(tryLen+1), tries+1, tryLen+1)
+        } 
       }
     }else{
       // no collision - so start a new call-stack
@@ -58,20 +66,16 @@ export const link = {
     keepalive:(urls:UrlSwitchAt<number>[]):DynamicKeepAlive => ({keepalive: urls}),
   },
   batch:{
-    create: async (inputs:BatchCreateElem[]) : Promise<ILink[]> => {
-      const batchinput = await Promise.all(inputs.map(linkFromStringOrStructured))
-      await appTable.batchWrite(batchinput)
-      return batchinput.map(b=>Object.values(b)).flat(1).map(v=> v.PutRequest?.Item as ILink)
-    },
     get: async (shorts: BatchGetElem[]):Promise<ILink[]> => {
       const batchGet = await appTable.batchGet(
         shorts.map(l=>link.ent.getBatch(l)) 
       ) as DocumentClient.BatchGetItemOutput
       return Object.values(batchGet.Responses ?? {}).flat(1) as ILink[]
     },
-    put: async(...links:ILink[])=>{
-      await appTable.batchWrite(links.map(l=>link.ent.putBatch(l)))
-      return links
+    put: async(...links:(ILink| BatchCreateElem)[])=>{
+      const listOLinks = await Promise.all(links.map(l=>link.create(l)))
+      await appTable.batchWrite(listOLinks.map(l=>link.ent.putBatch(l)))
+      return listOLinks
     },
   },
   ent: new Entity({
@@ -126,7 +130,7 @@ export type UrlSwitchAt<T> = {
 }
 
 // needs long
-export type BatchCreateElem = {long:string, short?:string}
+export type BatchCreateElem = CreateLinkInput
 
 // needs short
 export type BatchGetElem = {short:string, long?:string}

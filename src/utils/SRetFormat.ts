@@ -29,8 +29,8 @@ const gzipP = async (i:PromiseOr<NoStatusSRet>):Promise<NoStatusSRet> => {
   return {
     ...i,
     headers: { ...i.headers, 
-      'Content-Encoding': 'gzip' ,
-      'Content-Length': body.length,
+      'Content-Encoding': 'gzip',
+      'Content-Length': body.length
     },
     body,
     isBase64Encoded: true
@@ -43,8 +43,8 @@ const deflateP = async (i:PromiseOr<NoStatusSRet>):Promise<NoStatusSRet> => {
   return {
     ...i,
     headers: { ...i.headers, 
-      'Content-Encoding': 'br',
-      'Content-Length': body.length,
+      'Content-Encoding': 'deflate',
+      'Content-Length': body.length
     },
     body,
     isBase64Encoded: true
@@ -68,7 +68,12 @@ const brotliP = async (i:PromiseOr<NoStatusSRet>):Promise<NoStatusSRet> => {
 // #endregion compasbale-compressors
 
 export const respSelector = <T extends string | object>(fmtBody:(i:T)=>Promise<NoStatusSRet>, characterThreshold = 800) => 
-(defaultReturnValue:Partial<NoStatusSRet> = {}) => {
+( defaultReturnValue:Partial<NoStatusSRet> = 
+    { headers: {
+      'Access-Control-Allow-Origin':'*',
+      'Access-Control-Allow-Credentials': true
+    } }
+  ) => {
   // internal closure
   const acceptsEncClosure = async (s:string, i:T):Promise<NoStatusSRet> => {
     switch (s) {
@@ -126,8 +131,8 @@ export const jsonLDResp = async (i:{doc:JsonLdDocument, ctx:ContextDefinition}):
   const body = JSON.stringify(await flatten(await compact(i.doc, i.ctx)))
   return {
   headers: { 
+    'Content-Length': body.length,
     'Content-Type': 'applciation/ld+json',
-    'Content-Length': body.length
   },
   body,
   isBase64Encoded: false,
@@ -138,8 +143,8 @@ export const jsonResp = async (bodyInput:object): Promise<NoStatusSRet> => {
   const body = JSON.stringify(bodyInput)
   return {
   headers: { 
+    'Content-Length': body.length,
     'Content-Type': 'applciation/json' ,
-    'Content-Length': body.length
   },
   body,
   isBase64Encoded: false,
@@ -150,8 +155,8 @@ export const jsonResp = async (bodyInput:object): Promise<NoStatusSRet> => {
 export const htmlResp = async (html:string): Promise<NoStatusSRet> => {
   return {
   headers: { 
-    'Content-Type': 'text/html',
-    'Content-Length': html.length
+    'Content-Length': html.length,
+    'Content-Type': 'text/html'
   },
   body: html,
   isBase64Encoded: false,
@@ -174,7 +179,7 @@ export const imgResp = async (i:Buffer, ext:string): Promise<NoStatusSRet> => {
   return {
     headers: { 
       'Content-Type': lookup(ext) ,
-      'Content-length': body.length
+      'Content-length': body.length,
     },
     body,
     isBase64Encoded: true,

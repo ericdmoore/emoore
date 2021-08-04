@@ -1,6 +1,6 @@
 /* globals test expect describe beforeAll afterAll */
 
-import { link } from '../../src/entities/'
+import { link, ILink} from '../../src/entities/'
 import { appTable } from '../../src/entities/entities'
 
 // #region pure-tests
@@ -19,39 +19,37 @@ test('User - DynDB Inputs', async () => {
 })
 // #endregion pure-tests
 
-const lanks = ( async () =>
-  Promise.all([
+const linkDefs = [
       { short: 'ex', long: 'https://example1.com' },
       { short: 'example', long: 'https://example2.com' },
       { short: 'short', long: 'https://long-link-example.com' },
-      await link.create({long: 'https://long-link-example.com'})
-    ].map(l=>link.create(l))
-  ) 
-)()
+      { long: 'https://long-link-example.com'}
+]
+const _links:ILink[] = []
 
 describe('Using a Test Harness', () => {
   beforeAll(async () => {
-    const links = await lanks
-    await link.batch.create(links)
+    // const links = await lanks
+    const resLIst = await link.batch.put(...linkDefs)
+    resLIst.forEach(l=>_links.push(l))
+    
     // console.log('scan: ',  await appTable.scan() )
     // console.log('now batch get: ', await link.batch.get(links))
     // console.log('now query: ', await appTable.query( link.pk(links[0]),{beginsWith: link.sk(links[0])} ) )
   })
 
   afterAll(async () => {
-    const links = await lanks
-    await appTable.batchWrite( links.map(l => link.ent.deleteBatch(l)) )
+    // const links = await lanks
+    await appTable.batchWrite(linkDefs.map(l => link.ent.deleteBatch(l)) )
   })
 
   test('Verifiy Test Harness via the Example Link Hokey Pokey', async ()=>{
-    const links = await lanks
     const c = await link.batch.get([{short:'ex'}])
-    expect(c.filter(v=>v.long === links[0].long )).toHaveLength(1)
+    expect(c.filter(v=>v.long === linkDefs[0].long )).toHaveLength(1)
   })
 
   test('Get via Short Code', async () => {
-    const links = await lanks
-    const { short } = links[0]
+    const { short } = _links[0]
     const l = await link.get({ short })
 
     // console.log({l, l0: links[0]})
@@ -65,7 +63,6 @@ describe('Using a Test Harness', () => {
   })
 
   test('Already Used Vanity URL Test', async () => {
-    const links = await lanks
     const l = await link.create({
       short:'ex', 
       long:'https://exmaple-of-unavailable-vainity.com'
@@ -84,7 +81,6 @@ describe('Using a Test Harness', () => {
   })
 
   test('Make a Dynamic URL', async () => {
-    const links = await lanks
     const {rotates, geos, hurdles, keepalive} = link.dynamicConfig
 
     const almostWinner:string = 'https://almostwinner.raffle.com'
