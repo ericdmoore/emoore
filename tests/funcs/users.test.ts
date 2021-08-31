@@ -47,38 +47,12 @@ const signAcceptanceToken = jwtSign<IUserInfo>()
 const signAuthToken = jwtSign<JWTObjectInput>()
 const verifyToken = jwtVerify<IUerInfoOutputs>()
 
-beforeAll(async () => {
-  // load table data
-  await appTable.batchWrite(
-    await Promise.all(
-      userList.map(async u => {
-        const { email, plaintextPassword, ...usr } = u
-        return user.ent.putBatch({
-          ...usr,
-          email: u.email,
-          pwHash: await user.password.toHash(plaintextPassword),
-          backupCodes: await user.otp.genBackups(),
-          oobTokens: [await user.otp.gen2FA(u.uacct, 'TOTP', 'initial TOTP')]
-        })
-      })
-    ))// end user batch
-
-  await Promise.all([
-    ...userList.map(
-      async u => user.addExternalID(u.uacct, 'email', u.email)
-    )
-  ])
+beforeAll( async () => {
+  await user.batch.put(...userList)
 })
 
-afterAll(async () => {
-  // remove table data
-  // so as to not interfere with other test-suites
-  await appTable.batchWrite(
-    userList.map(u => user.ent.deleteBatch(u))
-  )
-  await appTable.batchWrite(
-    userList.map(u => userLookup.ent.deleteBatch({ exID: u.email, typeID: 'email' }))
-  )
+afterAll( async () => {
+  await user.batch.rm(...userList)
 })
 
 /*

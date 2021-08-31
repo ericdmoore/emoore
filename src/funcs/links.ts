@@ -51,7 +51,15 @@ export const validedGET:IFunc = async (event, ctx) => {
     )(event, ctx)
   } 
 }
-
+/**
+ * 
+ * @todo ADD PAGINATION
+ * @todo filter out unowned links?
+ * @param dataPayload 
+ * @param e 
+ * @param c 
+ * @param extras 
+ */
 export const getResponder: Responder<{short:string}[]> = async (dataPayload, e, c, extras) => {
   if(dataPayload.length ===0){
     // query mode
@@ -96,7 +104,6 @@ export const validatedPOST:IFunc = async (event, ctx) => {
 }
 
 /**
- * @todo remove existing links
  * @param _ data from validate 
  * @param e 
  */

@@ -7,8 +7,8 @@ import type { ILink } from './links'
 // import type { LinkKind } from './entities'
 
 export const userAccess = {
-  pk: (i:{uacct: string}) => `u#${decodeURI(i.uacct)}`,
-  sk: (i:{short: string}) => `ac#${decodeURI(i.short)}`,
+  pk: (i:{uacct: string}) => `u#${decodeURIComponent(i.uacct)}`,
+  sk: (i:{short: string}) => `ac#${decodeURIComponent(i.short)}`,
   batch:{
     get: async (uacct: string, ...shorts:string[]) => appTable.batchGet(shorts.map(short => userAccess.batch.params.get({uacct, short}))),
     put: async (...links:ILink[]) => appTable.batchWrite(links.map(l => userAccess.batch.params.put({...l, uacct:l.ownerUacct}))),
@@ -33,8 +33,8 @@ export const userAccess = {
       long: { type: 'string', required: true},
       role: { type: 'string' },
       displayName: { type: 'string' },
-      pk: { hidden: true, partitionKey: true, dependsOn: 'uacct', default: (data:any) => `u#${data.uacct}` },
-      sk: { hidden: true, sortKey: true, dependsOn: 'short', default: (data:any) => `ac#${data.short}` }
+      pk: { hidden: true, partitionKey: true, dependsOn: 'uacct', default: (data:any) => userAccess.pk(data) },
+      sk: { hidden: true, sortKey: true, dependsOn: 'short', default: (data:any) => userAccess.sk(data) }
     })
   })
 }

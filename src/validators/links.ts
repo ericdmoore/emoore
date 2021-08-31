@@ -22,10 +22,11 @@ import {
 import { possible } from '../utils/codecs'
 import pluckDataFor from '../utils/pluckData'
 import {link} from '../entities'
+import JSONparse from '../utils/jsonParse'
 
 // #region helpers
 
-const JSONParse = (input:string)=>{
+const JSONParse = (input:string): ({data:unknown, er:null} | {data:null, er:Error})=>  {
   try{ return {er:null, data: JSON.parse(input)} }
   catch(er:unknown){ return {er: er as Error, data:null} }
 }
@@ -37,6 +38,8 @@ const makesURLError = (shortPath:string)=>{
 
 export const pluckPaths = (whereToLook:string) => (e:Evt): unknown => {
   const paths = pluckDataFor(whereToLook)(e, '[]' as string)
+
+  // console.log(JSONparse(paths))
   return JSON5.parse(paths, function(_, val){
     return typeof val ==='string' 
       ? decodeURIComponent(val)
@@ -155,17 +158,18 @@ export const updateCommandIsValid = (keyForVerifedData ='verifiedUpdateCmd'):Val
       }
     }
     const {er, data} = JSONParse(updateStr)
+    const d = data as object
     if(er){
       return {
         code:400,
         passed: false,
         reason:`Stringified update command was not parsable JSON ${er}`,
         InvalidDataLoc:'[H>Q>C].update',
-        InvalidDataVal:data,
+        InvalidDataVal: d.toString(),
       }
     }
     else{
-      const entries = Object.entries(data)
+      const entries = Object.entries(d)
       if(entries.length>25){
         return {
           code:400,

@@ -24,6 +24,9 @@ export const dateFmt = (fmt:string = 'YYYYMMDDHH') => {
   const quaterHrChars = ['a', 'b', 'c', 'd']
   const tenMinBlockChars = ['0', '1', '2', '3', '4', '5']
   return (epoch:number) => {
+    if(fmt ==='AllTime'){
+      return '_all'
+    }
     const d = new Date(epoch)
     const YYYY = d.getUTCFullYear().toString()
     const YY = p2(d.getUTCFullYear().toString().slice(-2))

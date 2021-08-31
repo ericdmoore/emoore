@@ -1,19 +1,51 @@
-import type { IFunc, Responder, SRet, Evt, JWTelementsExtras } from '../types'
+import type { IFunc, Responder, SRet } from '../types'
+import type { ILink, DynamicKind, UrlSwitchAt} from '../entities/links'
+import type {DocumentClient} from 'aws-sdk/clients/dynamodb'
+
 import baseHandle from '../utils/methodsHandler'
 import validate from './validations'
 import { respSelector, jsonResp }from '../utils/SRetFormat'
-import { appTable, link, linkClickCountsByDay, userAccess } from '../entities'
-import type { ILink, DynamicKind, UrlSwitchAt} from '../entities/links'
-import {jwtVerify} from '../auths/validJWT'
-import pluckDataFor from '../utils/pluckData'
+import { link, linkClickCountsByDay } from '../entities'
+
 import HTTPstatusCodes from '../enums/HTTPstatusCodes'
 import fastgeoip from 'fast-geoip'
 import {IResult, UAParser} from 'ua-parser-js'
-import { userList } from '../../tests/funcs/users.test'
+import {click} from '../entities'
+import {intervalToDuration} from 'date-fns'
 
 const compressableJson = respSelector(jsonResp)
 
-// #region
+// #region types
+
+
+type Union1toSeven = '1' | '2' | '3' | '4' | '5' | '6' | '7' 
+type Union1toFour  = '1' | '2' | '3' | '4'
+type Union1toThree = '1' | '2' | '3' 
+
+
+
+interface OneToThree{
+    '1':number
+    '2':number
+    '3':number
+}
+
+interface OneToFour{
+    '1':number
+    '2':number
+    '3':number
+    '4':number
+}
+
+interface OneToSeven{
+    '1':number
+    '2':number
+    '3':number
+    '4':number
+    '5':number
+    '6':number
+    '7':number
+}
 
 type ExpandLinkEvent = ExpandEvent_Click | ExpandEvent_API
 
@@ -53,44 +85,125 @@ interface ExpandEvent_API{
     // how
 }
 
-interface ExpandLinkHistory{
+export interface ExpandLinkHistory{
     allTimeExpansions: number
-    last24h: number
     lastClick: number
-    maxElapsedBetweenClicks?: number
-    daysAgo:{
-        '1':number
-        '2':number
-        '3':number
-        '4':number
-        '5':number
-        '6':number
-        '7':number
-    }
-    weeksAgo:{
-        '1':number
-        '2':number
-        '3':number
-        '4':number
-    }
-    monthsAgo:{
-        '1':number
-        '2':number
-        '3':number
-    }
+    // maxElapsedBetweenClicks?: number
+    last24Hr: number[]
+    daysAgo: OneToSeven
+    weeksAgo: OneToFour
+    monthsAgo: OneToThree
 }
 
-// #endregion
+// #endregion types
+
+const uaparser = new UAParser()
 
 const cdfify = (nums: number[]) =>nums.reduce((p,c)=>({
     acc: p.acc + c, 
     arr: [...p.arr, p.acc + c] 
 }), {acc:0, arr:[] as number[]} ).arr // throw away the helper acc value
 
-const uaparser = new UAParser()
+const groupBy = (windowType:'days' | 'weeks' |'months' ) =>{
+    
+    const end = new Date()
+    let init: (OneToSeven | OneToFour | OneToThree ) & {'0':number}
+    
+    switch(windowType){
+        case 'days':
+            init = {'0':0, '1':0,'2':0,'3':0,'4':0,'5':0,'6':0,'7':0} 
+            break
+        case 'weeks':
+            init = {'0':0,'1':0,'2':0,'3':0,'4':0} 
+            break
+        case 'months':
+            init = {'0':0,'1':0,'2':0,'3':0}
+            break
+    }
+
+    const reducer = (p: OneToSeven | OneToFour | OneToThree, c: DocumentClient.AttributeMap, i:number, arr:DocumentClient.AttributeMap[])=>{
+        let priorVal: number
+        let durationTypeCount: Union1toSeven
+        const agoDuration = intervalToDuration({ end, start: new Date(c.cts) })
+
+        switch(windowType){
+            case 'days':
+
+                durationTypeCount = (agoDuration[windowType] ?? 0 ).toString() as Union1toSeven
+                priorVal = (p as OneToSeven)[durationTypeCount]
+                
+                // console.log({cts:c.cts, pv: priorVal, days:durationTypeCount})
+                
+                return { ...p,  [durationTypeCount]: priorVal + 1 } as OneToSeven & {'0'?:number}
+            case 'weeks':
+                const days = agoDuration.days ?? 0 
+                const durLt7  = Math.floor(days / 7)
+                durationTypeCount = durLt7.toString() as Union1toFour
+                priorVal = (p as OneToFour)[durationTypeCount]
+
+                // console.log({ days, durLt7, weeks:durationTypeCount, cts: new Date(c.cts), pv: priorVal})
+
+                return { ...p,  [durationTypeCount]: priorVal + 1 } as OneToFour & {'0'?:number}
+            case 'months':
+                durationTypeCount = (agoDuration[windowType] ?? 0 ).toString() as Union1toThree
+                priorVal = (p as OneToThree)[durationTypeCount]
+                
+                // console.log({cts:c.cts, pv: priorVal, months:durationTypeCount})
+                
+                return { ...p,  [durationTypeCount]: priorVal + 1 } as OneToThree & {'0'?:number}
+        }
+    }
+
+    return (arr: DocumentClient.AttributeMap[])=>{
+        // console.log({arr, windowType })
+        // windowType === 'weeks' && console.log({windowType},arr.map(c => intervalToDuration({ end, start: new Date(c.cts) })))
+        const ret = arr.reduce(reducer, init) as ((OneToSeven | OneToFour | OneToThree) & {'0'?:number})
+        '0' in ret && delete ret['0']
+        return ret
+    }
+}
+
+const max = (arr: {cts:number}[])=>arr.reduce((p,c)=> c.cts > p ? c.cts : p, -Infinity)
+
+export const getLinkHistory = async(short: string, stop = Date.now()) : Promise<ExpandLinkHistory> => {
+    // console.log('getLinkHistory',{short, stop})
+    
+    const [
+        allTimeExpansions, 
+        hours24, 
+        days7, 
+        weeks4, 
+        months3 
+    ] = await Promise.all([
+        click.query.count(short, {stop}),
+        click.query.last24Hrs({short, stop}),
+        click.query.byDays({short, stop, goBack:7+1}),
+        click.query.byWeeks({short, stop, goBack:4+1}),
+        click.query.byMonths({short, stop, goBack:3+1}),
+    ])
+    
+    // console.log(weeks4.Items?.length)
+    // console.dir(weeks4)
+    // console.dir(months3)
+
+    const daysAgo = groupBy('days')(days7.Items ??[]) as OneToSeven
+    const weeksAgo = groupBy('weeks')( weeks4.Items ??[]) as OneToFour
+    const monthsAgo = groupBy('months')( months3.Items ??[]) as OneToThree
+        
+    return {
+        lastClick: max((hours24.Items ?? []) as {cts:number}[]),
+        last24Hr: (hours24.Items ?? []).map(click => click.cts as number), // [cts]
+        allTimeExpansions: allTimeExpansions.Count ?? -1,
+        // maxElapsedBetweenClicks: -1,
+        daysAgo,
+        weeksAgo,
+        monthsAgo
+    }
+}
 
 /**
- * @todo Deal with nested definitions of regions. Match the most specific, if no matches move to less specific and search again. 
+ * @todo Deal with hierarchy/nested regional definitions for link.dynamicConfig. 
+ * Match the most specific, if no matches move to less specific and search again. 
  * This would make the CATCH_ALL case the `region:"earth"` case
  * Match: Neighborhood, City, County, State, Country, Continent
  * Do similar for Countries with hierarchical nesting regions
@@ -259,49 +372,46 @@ export const validatedGET:IFunc = async (event, ctx) => {
         )(event,ctx)
 }
 
+/**
+ * @param d 
+ * @param e 
+ * @param c 
+ * @param extras
+ */
 export const getResponder: Responder<{found:ILink}> = async (d, e, c, extras) => {
     const statusCode = HTTPstatusCodes.TEMPORARY_REDIRECT
-    const history: ExpandLinkHistory = {
-        last24h: 0,
-        lastClick: Date.now() - 3600 * 48,
-        allTimeExpansions: 0,
-        daysAgo:{
-            "1":0,
-            "2":0,
-            "3":0,
-            "4":0,
-            "5":0,
-            "6":0,
-            "7":0
-        },
-        weeksAgo:{
-            '1':0,
-            '2':0,
-            '3':0,
-            '4':0
-        },
-        monthsAgo:{
-            '1':0,
-            '2':0,
-            '3':0,
-        }
-    }
+
+    const history = await getLinkHistory(d.found.short)
+    const nullableGeo = await fastgeoip.lookup(e.requestContext.http.sourceIp)
+    const geo = !!nullableGeo ? nullableGeo : undefined
+
+    await click.batch.save([{
+        short: d.found.short,
+        long: d.found.long, 
+        ip: e.requestContext.http.sourceIp,
+        useragent: e.requestContext.http.userAgent,
+        cts: Date.now(),
+        geo,
+    }])
+
     const event: ExpandLinkEvent = {
         kind: 'click',
-        ip: e.requestContext.http.sourceIp,
+        geo: nullableGeo,
         time: Date.now(),
-        geo: await fastgeoip.lookup(e.requestContext.http.sourceIp),
+        ip: e.requestContext.http.sourceIp,
         useragent: uaparser.setUA(e.requestContext.http.userAgent).getResult()
     }
 
     const Location =  await calcDyanmic(d.found, event, history)
+
     const ret : SRet = { 
         statusCode, 
-        headers:{ Location },
+        headers: { Location, 'X-History': JSON.stringify(history)},
         isBase64Encoded: false
     }
     return ret
 }
+
 
 // export const validatedPOST:IFunc = async (event, ctx) => {
 //     return validate(postResponder, {})(event,ctx)

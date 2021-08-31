@@ -103,7 +103,7 @@ export const userShouldNotPrexist: ValidationTest<Partial<FlatPostUserInfo>> = a
 }
 
 
-export const hasAllRequiredFields = (reason:string, keys:string[]): ValidationTest<FlatPostUserInfo> => async (e) => {
+export const hasAllRequiredFields = (keys:string[], reason:string): ValidationTest<FlatPostUserInfo> => async (e) => {
   return {
     code: 400,
     reason,

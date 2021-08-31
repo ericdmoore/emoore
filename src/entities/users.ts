@@ -84,7 +84,7 @@ export const user = {
    * @param i
    * @readsDB 2x
    */
-  lookupVia: async (i:{typeID:'phone'|'email', exID?:string | null}) => {
+  lookupVia: async (i:{typeID:'phone'|'email', exID?:string | null}): Promise<IUser | undefined> => {
     if (i.exID) {
       const UserDyn = await userLookup.ent.get(i)
       return UserDyn.Item
@@ -139,20 +139,9 @@ export const user = {
     const oobTokens = [...oobTokenInputs, await user.otp.gen2FA(uacct, 'TOTP')]
     const backupCodes = [...backupCodeInputs, ...await user.otp.genBackups()]
     const pwHash = await user.password.toHash(plaintextPassword)
-    // const delegation = {
-    //   delegateFor: [] as string[],
-    //   revocableStartersTo: delegateToUaccts
-    // }
-
-    await user.ent.put({
-      uacct,
-      email,
-      // delegation,
-      displayName,
-      oobTokens,
-      backupCodes,
-      pwHash
-    })
+    
+    // delegation, 
+    await user.ent.put({ uacct, email, displayName, oobTokens, backupCodes, pwHash })
     await user.addExternalID(uacct, 'email',email)
     
     return {
@@ -166,20 +155,21 @@ export const user = {
     }
   },
   batch:{
-    put : async (...userList:{
-      email: string, 
-      uacct: string, 
-      displayName:string, 
-      plaintextPassword: string}[])=>{
-        return Promise.all(
-          userList.map(u=>user.genUser(
-            u.email,
-            u.plaintextPassword,
-            u.uacct,
-            u.displayName
-          ))
+    put : async (...userList:UseBase[])=> Promise.all(
+          userList.map(
+            u=>user.genUser(
+              u.email,
+              u.plaintextPassword,
+              u.uacct,
+              u.displayName)
+          )
         )
-    },
+    ,
+    rm: async (...userList:UseBase[])=>Promise.all([
+      appTable.batchWrite(userList.map(u => user.ent.deleteBatch(u))),
+      appTable.batchWrite(userList.map(u => userLookup.ent.deleteBatch({exID: u.email, typeID:'email'}))),
+    ]),
+    get: async (...userList:UseBase[])=>appTable.batchGet(userList.map(u=> user.ent.getBatch(u)))
   },
   password: {
     /**
@@ -326,6 +316,20 @@ export const user = {
       sk: { hidden: true, sortKey: true, dependsOn: 'uacct', default: (data:any) => user.sk(data) }
     })
   })
+}
+
+interface UseBase{
+  email: string
+  uacct: string
+  displayName:string
+  plaintextPassword: string
+}
+
+interface UseBase{
+  email: string
+  uacct: string
+  displayName:string
+  plaintextPassword: string
 }
 
 export default user

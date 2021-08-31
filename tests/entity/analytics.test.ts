@@ -40,11 +40,11 @@ const genRandClickData = async (
     .map(() =>
       click.ent.putBatch({
         ...example,
-        time: randBetween(startingDateMs, finishDateMs)
+        cts: randBetween(startingDateMs, finishDateMs)
       })
     )
-  clickData.push(click.ent.putBatch({ ...example, time: startingDateMs - 1000 }))
-  clickData.push(click.ent.putBatch({ ...example, time: finishDateMs + 1000 }))
+  clickData.push(click.ent.putBatch({ ...example, cts: startingDateMs - 1000}))
+  clickData.push(click.ent.putBatch({ ...example, cts: finishDateMs + 1000}))
 
   const regenData = grabItems(clickData)
   // console.log(regenData.slice(0, 2))
@@ -68,7 +68,7 @@ beforeAll(async () => {
   console.log({ upTo400 })
 
   const zero = ts
-  const items1 = await genRandClickData(upTo400, zero, zero - msInDays(1)) // [now - 1d ago] with upTo400 Clicks
+  const items1 = await genRandClickData(upTo400, zero,               zero - msInDays(1)) // [now - 1d ago] with upTo400 Clicks
   const items2 = await genRandClickData(upTo400, zero - msInDays(1), zero - msInDays(4)) // [1d ago - 4d ago
   const items3 = await genRandClickData(upTo400, zero - msInDays(4), zero - msInDays(14)) // [4d ago - 14d ago]
   const items4 = await genRandClickData(upTo400, zero - msInDays(14), zero - msInDays(90)) // [14d ago - 90d ago]
@@ -88,7 +88,7 @@ afterAll(async () => {
 test('query DataStore for Dashboard.1 - 01 Day', async () => {
   const short = 'ddg'
   const { tsHi, tsLo } = { tsHi: ts, tsLo: ts - msInDays(1) }
-  const r = await click.queryRange({ short, tsHi, tsLo })
+  const r = await click.query.usingRange({ short, start: tsLo, stop:tsHi })
 
   expect(r).toHaveProperty('Count')
   expect(r).toHaveProperty('ScannedCount')
@@ -99,7 +99,7 @@ test('query DataStore for Dashboard.1 - 01 Day', async () => {
 test('query DataStore for Dashboard.2 - 04 Days', async () => {
   const short = 'ddg'
   const { tsHi, tsLo } = { tsHi: ts, tsLo: ts - msInDays(4) }
-  const r = await click.queryRange({ short, tsHi, tsLo })
+  const r = await click.query.usingRange({ short, start: tsLo, stop:tsHi })
 
   expect(r).toHaveProperty('Count')
   expect(r).toHaveProperty('ScannedCount')
@@ -110,7 +110,7 @@ test('query DataStore for Dashboard.2 - 04 Days', async () => {
 test('query DataStore for Dashboard.3 - 14 Days', async () => {
   const short = 'ddg'
   const { tsHi, tsLo } = { tsHi: ts, tsLo: ts - msInDays(14) }
-  const r = await click.queryRange({ short, tsHi, tsLo })
+  const r = await click.query.usingRange({ short, start: tsLo, stop:tsHi })
 
   expect(r).toHaveProperty('Count')
   expect(r).toHaveProperty('ScannedCount')
@@ -121,7 +121,7 @@ test('query DataStore for Dashboard.3 - 14 Days', async () => {
 test('query DataStore for Dashboard.4 - 90 Days', async () => {
   const short = 'ddg'
   const { tsHi, tsLo } = { tsHi: ts, tsLo: ts - msInDays(90) }
-  const r = await click.queryRange({ short, tsHi, tsLo })
+  const r = await click.query.usingRange({ short, start: tsLo, stop:tsHi })
 
   expect(r).toHaveProperty('Count')
   expect(r).toHaveProperty('ScannedCount')

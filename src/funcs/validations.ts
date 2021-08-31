@@ -33,12 +33,14 @@ export const validate = <T>(responder: Responder<Required<NonNullObj<T>>>, preVa
   return async (event, context) => {
     const allFuncResp = ( await Promise.all(
         tests.map(async (t) => t(event, context, preValidationData))
-      ).catch(er => [{
+      ).catch(er => {
+        console.error('validationTestFunc rejected:', er)
+        return [{
         code: 400,
         reason: 'Experienced an Application Error During Validation',
         passed: false,
         InvalidDataVal: er
-      }] as ValidationResp[]))
+      }] as ValidationResp[]}))
 
     const expensiveData = (allFuncResp.filter(t => typeof t !== 'boolean' ) as ValidationResp[])
       .reduce(

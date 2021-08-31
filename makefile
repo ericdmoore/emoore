@@ -7,7 +7,7 @@ test:
 
 tests: test
 
-build-rm:
+rm-build:
 	rm -rf build/
 
 build-cloud: 
@@ -27,7 +27,9 @@ cloud-install:
 
 deploy:
 	cd cloud; pwd; npm run cdk deploy
-	
+
+preflight: build show-extras rm-build test
+
 schema-gen: 
 	npx ts-node src/models/mergeSchemas.ts
 
@@ -39,6 +41,26 @@ schema-inspect: schema-gen
 
 schema-check: schema-lint schema-inspect
 	@echo Schema Linted and Introspected
+
+show-extras: code-show-todos tests-show-todo tests-show-skip
+
+code-show-todos:
+	find ./src -name "*.ts" -exec grep -Hin "@todo" {} \;
+	find ./src -name "*.ts" -exec grep -Hin "@todo" {} \; | wc -l
+
+tests-show-todo:
+	@echo "##TODOs"
+	find ./tests -name "*.test.ts" -exec grep -Hin "test.todo" {} \;
+	find ./tests -name "*.test.ts" -exec grep -Hin "test.todo" {} \; | wc -l;
+
+tests-show-skip:
+	@echo "##Skipped"
+	find ./tests -name "*.test.ts" -exec grep -Hin "test.skip" {} \;
+	find ./tests -name "*.test.ts" -exec grep -Hin "test.skip" {} \; | wc -l;
+
+tests-show-more: tests-show-todo tests-show-skip
+	@echo ""
+	@echo "> #Showing All Unfinished Tests"
 
 list:
 	@echo 

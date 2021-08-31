@@ -7,10 +7,6 @@ import { appTable, customTimeStamps } from './entities'
 import { Entity } from 'dynamodb-toolbox'
 import { nanoid } from 'nanoid'
 
-const linkFromStringOrStructured = async (v:BatchCreateElem, i:number, a: BatchCreateElem[]) => {
-  return link.ent.putBatch(await link.create(v))
-}
-
 const isEmpty = (obj :object)=> Object.keys(obj).length === 0 
 
 export const link = {

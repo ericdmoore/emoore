@@ -21,7 +21,7 @@ describe('User Access Entity', () => {
         expect(paramPut).toBeTruthy()
     })
 
-    test('Extra Params Throw Errors', async ()=>{
+    test('Extra Params Throw Errors', ()=>{
         try{
             const putParam = userAccess.batch.params.put({
                 long:'http://long.com', 

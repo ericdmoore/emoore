@@ -178,7 +178,8 @@ const compareRuns = (comparisonMeta:{title:string},series1:Dict<number>, series2
 }
 
 const writeToFile = async (ws:WriteStream, data:object | string)=>new Promise((resolve, reject)=>{
-    ws.on('close', resolve).write(JSON.stringify(data, null, 2))
+    ws.on('close', resolve)
+    .write(JSON.stringify(data, null, 1))
 })
 
 ;(async ()=>{
@@ -245,7 +246,10 @@ const writeToFile = async (ws:WriteStream, data:object | string)=>new Promise((r
         await compareRuns({title:'Lines'} , fileLineCount, lastRunData.fileLineCount as Dict<number>)
         await compareRuns({title:'Chars'} , fileCharCount, lastRunData.fileCharCount as Dict<number>)
         
-        await writeToFile( createWriteStream(FILEPATH,{emitClose:true}), { fileCharCount, fileLineCount})
+        await writeToFile(
+            createWriteStream(FILEPATH,{ emitClose:true, flags:'w+'}),
+            { fileCharCount, fileLineCount, time: Date.now() }
+        )
 
     }
 })()

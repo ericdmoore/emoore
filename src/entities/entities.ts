@@ -8,13 +8,9 @@ import { EntityAttributes } from 'dynamodb-toolbox/dist/classes/Entity'
 
 // #region interfaces
 type Dict<T> = {[key:string]:T}
-export type IBucketTimeResolutions = 'Min'|'Tmb'|'Hr'|'Day'|'Month'|'Year'
+export type IBucketTimeResolutions = 'Min'|'Tmb'|'Hr'|'Day'|'Month'|'Year' |'AllTime'
 
-export interface iClickEventRangeQuery{
-  short: string
-  tsLo: number
-  tsHi: number
-}
+
 export interface IQueryRangeReturn{
   Items: unknown[]
   Count: number
@@ -37,16 +33,7 @@ export interface ClickGet{
   time: number
 }
 
-export interface ClickPut{
-  short: string
-  time: number
-  long: string
-  bucketID?: string
-  ip?: string
-  geo?: {regionType:string, value:string}[]
-  tzOffSet?: number
-  useragent?: {[deviceKey:string]:string}
-}
+
 
 export interface ClickBucketByTimeGet{
   short:string

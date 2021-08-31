@@ -1,7 +1,5 @@
 /**
  * @author [Eric D Moore](https://ericdmoore.com)
- * @todo Deal with onBehalf{uacct} -vs- me{uacct}
- *       but account delegation is not obviously required for link shortening
  * @copyright All rights resvered © 2021
  * @license MIT
  */
@@ -185,8 +183,8 @@ const validatedPOST: IFunc = async (e, c) => {
     { acceptanceTok, ...uInfo },
     userShouldNotPrexist,
     hasAllRequiredFields(
-      `To Add A User - Provide All Required Field: ['email','plaintextPassword']`,
-      ['email', 'plaintextPassword']),
+      ['email', 'plaintextPassword'],
+      `To Add A User - Provide All Required Field: ['email','plaintextPassword']`),
     acceptanceTokenSigShouldMatchInlineInfo
   )(e, c)
 }
@@ -227,8 +225,8 @@ const validatedDELE: IFunc = async (e, c) => {
 }
 
 /**
- * @todo Deal with onBehalf{uacct} -vs- me{uacct}
- * @todo - how to delegate? new endpoint?
+ * @note If Dealing with onBehalf{uacct} -vs- me{uacct}
+ * @note - cnosider a new endpoint:
  * authToken + `/delegations`
  *
  * Consider:
