@@ -7,12 +7,12 @@
 [Tutorials](https://github.com/ericdmoore/emoore/wiki/Tutorials) | [Concepts](https://github.com/ericdmoore/emoore/wiki/Concepts) | [How To Guides](https://github.com/ericdmoore/emoore/wiki/Guides) | [Reference](https://github.com/ericdmoore/emoore/wiki/Documentation)
 
 
-## WHat is it
+## What is it?
 
 - an executable and embeddable cloud `liBin` (aka: lib + bin)
 - Executable API + Schema For Upstream consumtion
 
-## What Problem Does it Solve
+## What Problem Does it Solve?
 
 For the stingy jerks out there that dont want to run a DB that charges us by the second, but rather by compute and storage, think of this a stingy man's replacement of `YOURLS` or `bit.ly`
 
@@ -33,7 +33,6 @@ For the stingy jerks out there that dont want to run a DB that charges us by the
 3. GDPR Workaround - ( a link that changes based on the geography of who clicked it):
 4. Expiring Links - (a link that will change as it ages)
 5. A Very Fancy Link - (a mixture of all the above):
-
 
 ## Roadmap
 
