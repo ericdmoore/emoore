@@ -1,5 +1,5 @@
 /* globals test expect */
-import dateFmt from '../../src/utils/dateFmt'
+import dateFmt from '../../server/utils/dateFmt'
 
 // console.log('tz Offset(s): ', (new Date()).getTimezoneOffset())
 

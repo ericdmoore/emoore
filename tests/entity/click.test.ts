@@ -1,4 +1,4 @@
-import {click, ClickInputs} from '../../src/entities'
+import {click, ClickInputs} from '../../server/entities'
 import type {IResult} from 'ua-parser-js'
 
 test('PK',()=>{

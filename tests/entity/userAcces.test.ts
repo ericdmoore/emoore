@@ -1,5 +1,5 @@
-import {userAccess} from '../../src/entities/userAccess'
-import type {IUserAccess} from '../../src/entities/userAccess'
+import {userAccess} from '../../server/entities/userAccess'
+import type {IUserAccess} from '../../server/entities/userAccess'
 
 describe('User Access Entity', () => {
 

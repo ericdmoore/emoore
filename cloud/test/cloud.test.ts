@@ -5,7 +5,7 @@ import * as Cloud from '../lib/cloud-stack';
 test('Empty Stack', () => {
     const app = new cdk.App();
     // WHEN
-    const stack = new Cloud.CloudStack(app, 'MyTestStack');
+    const stack = new Cloud.EmooreStack(app, 'MyTestStack');
     // THEN
     expectCDK(stack).to(matchTemplate({
       "Resources": {}

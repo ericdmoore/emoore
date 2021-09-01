@@ -14,7 +14,7 @@ build-cloud:
 	cd cloud; pwd; npm ci; npm run build; npx cdk synth
 
 line-count:
-	npx ts-node tools/linecount.ts -- src/**/*.ts
+	npx ts-node tools/linecount.ts -- server/**/*.ts
 
 build-code:
 	pwd; npx tsc
@@ -31,13 +31,13 @@ deploy:
 preflight: build show-extras rm-build test
 
 schema-gen: 
-	npx ts-node src/models/mergeSchemas.ts
+	npx ts-node server/models/mergeSchemas.ts
 
 schema-lint: schema-gen
-	${LINTER} src/models/merged.gen.graphql
+	${LINTER} server/models/merged.gen.graphql
 
 schema-inspect: schema-gen
-	 ${INSPECTOR} src/models/merged.gen.graphql --comments true
+	 ${INSPECTOR} server/models/merged.gen.graphql --comments true
 
 schema-check: schema-lint schema-inspect
 	@echo Schema Linted and Introspected
@@ -45,8 +45,8 @@ schema-check: schema-lint schema-inspect
 show-extras: code-show-todos tests-show-todo tests-show-skip
 
 code-show-todos:
-	find ./src -name "*.ts" -exec grep -Hin "@todo" {} \;
-	find ./src -name "*.ts" -exec grep -Hin "@todo" {} \; | wc -l
+	find ./server -name "*.ts" -exec grep -Hin "@todo" {} \;
+	find ./server -name "*.ts" -exec grep -Hin "@todo" {} \; | wc -l
 
 tests-show-todo:
 	@echo "##TODOs"

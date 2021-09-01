@@ -2,7 +2,7 @@
 import {
   link,
   appTable
-} from '../../src/entities'
+} from '../../server/entities'
 
 // import type { Entity } from 'dynamodb-toolbox'
 // import dateFmt from '../../src/utils/dateFmt'

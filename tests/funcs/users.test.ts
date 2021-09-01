@@ -1,14 +1,14 @@
 /* globals describe test expect beforeEach afterEach beforeAll afterAll */
-import type { Evt, SRet, JWTObjectInput, JWTelementsExtras, JWTelementsOptionInputs} from '../../src/types'
-import handler from '../../src/funcs/users'
-import { user, appTable } from '../../src/entities'
+import type { Evt, SRet, JWTObjectInput, JWTelementsExtras, JWTelementsOptionInputs} from '../../server/types'
+import handler from '../../server/funcs/users'
+import { user, appTable } from '../../server/entities'
 import { event, ctx } from '../gatewayData'
 import { nanoid } from 'nanoid'
-import { userLookup } from '../../src/entities/userLookup'
-import { jwtSign, jwtVerify } from '../../src/auths/validJWT'
+import { userLookup } from '../../server/entities/userLookup'
+import { jwtSign, jwtVerify } from '../../server/auths/validJWT'
 import { brotliDecompress } from 'zlib'
 import { promisify } from 'util'
-import { btoa, atob } from '../../src/utils/base64'
+import { btoa, atob } from '../../server/utils/base64'
 // import { sign } from 'jsonwebtoken'
 
 const openBrotliP = promisify(brotliDecompress)

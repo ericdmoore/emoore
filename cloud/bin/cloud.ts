@@ -4,7 +4,8 @@
 import * as cdk from '@aws-cdk/core'
 import * as apigV2 from '@aws-cdk/aws-apigatewayv2'
 import * as lambda from '@aws-cdk/aws-lambda'
-import { CloudStack } from '../lib/cloud-stack'
+
+import { EmooreStack } from '../lib/cloud-stack'
 import { config } from 'dotenv'
 import { Functions } from '../lib/functions'
 import { APIGateway } from '../lib/gateway'
@@ -37,11 +38,13 @@ interface FnReadyForGateway{
 const funcs = {
   // pattern
   // funcID: {src: path: methods?: apigV2.HttpMethod[], authorizer?: apigV2.IHttpRouteAuthorizer}
+  clicks: { path: '/clicks', src: ['clicks.ts'], methods: [apigV2.HttpMethod.ANY] },
+  expand: { path: '/expand', src: ['clicks.ts'], methods: [apigV2.HttpMethod.ANY] },
+  links: { path: '/links', src: ['links.ts'], methods: [apigV2.HttpMethod.ANY] },
   root: { path: '/', src: ['root.ts'], methods: [apigV2.HttpMethod.GET] },
+  stats: { path: '/stats', src: ['clicks.ts'], methods: [apigV2.HttpMethod.ANY] },
   tokens: { path: '/tokens', src: ['tokens.ts'], methods: [apigV2.HttpMethod.ANY] },
   users: { path: '/users', src: ['users.ts'], methods: [apigV2.HttpMethod.ANY] },
-  links: { path: '/links', src: ['links.ts'], methods: [apigV2.HttpMethod.ANY] },
-  clicks: { path: '/clicks', src: ['clicks.ts'], methods: [apigV2.HttpMethod.ANY] }
   // graphql: { path: '/graphql', src: ['graphql.ts'], methods: [apigV2.HttpMethod.GET, apigV2.HttpMethod.POST] }
 }
 
@@ -56,13 +59,13 @@ clicks
 ;(async () => {
   const app = new cdk.App()
 
-  const cdkStack = new CloudStack(app, 'EmooreStack', {
+  const cdkStack = new EmooreStack(app, 'EmooreStack', {
     stackName: 'emoore-stack',
-    description: 'An application that runs on emoo.re'
+    description: 'A short link application for shrinking and expanding'
     /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
   })
 
-  const srcBase = [__dirname, '../../src/funcs']
+  const srcBase = [__dirname, '../../server/funcs']
   const zipBase = [__dirname, '../fnPkgs']
   const basePaths = [srcBase, zipBase] as [string[], string[]]
 

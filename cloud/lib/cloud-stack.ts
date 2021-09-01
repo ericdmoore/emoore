@@ -10,7 +10,7 @@ import { Bucket } from '@aws-cdk/aws-s3'
 // #region interfaces
 
 // #endregion interfaces
-export class CloudStack extends cdk.Stack {
+export class EmooreStack extends cdk.Stack {
   scope: cdk.Construct
   table: dynamodb.Table
   bucket: s3.Bucket

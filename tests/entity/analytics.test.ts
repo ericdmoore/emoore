@@ -3,8 +3,8 @@
 // import { DynamoDB } from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
 // import { DynamoDB } from 'aws-sdk'
-import { appTable, click } from '../../src/entities'
-import chunky from '../../src/utils/batchChunks'
+import { appTable, click } from '../../server/entities'
+import chunky from '../../server/utils/batchChunks'
 
 const msInDays = (n: number) => n * 86_400_000
 const randInt = (asBigAs:number) => Math.floor(Math.random() * asBigAs)

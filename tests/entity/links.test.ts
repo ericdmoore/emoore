@@ -1,7 +1,7 @@
 /* globals test expect describe beforeAll afterAll */
 
-import { link, ILink} from '../../src/entities/'
-import { appTable } from '../../src/entities/entities'
+import { link, ILink} from '../../server/entities'
+import { appTable } from '../../server/entities/entities'
 
 // #region pure-tests
 test('User - DynDB Inputs', async () => {

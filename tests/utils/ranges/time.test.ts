@@ -2,7 +2,7 @@ import {
     minSteppedArray, 
     makeSteppedArray, 
     monthedSteppedArray
-} from '../../../src/utils/ranges/time'
+} from '../../../server/utils/ranges/time'
 
 test('3 month range', ()=>{
     const start = 1628693747471

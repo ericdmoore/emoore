@@ -1,5 +1,5 @@
-import { incomingLongLink, incomingLongLinkFullKind } from '../../src/validators/links'
-import {link} from '../../src/entities/links'
+import { incomingLongLink, incomingLongLinkFullKind } from '../../server/validators/links'
+import {link} from '../../server/entities/links'
 import * as t from 'io-ts'
 import {isRight} from 'fp-ts/lib/Either'
 

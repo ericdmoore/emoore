@@ -1,3 +1,4 @@
+
 import type { IFunc, Responder, SRet, Evt, JWTelementsExtras } from '../types'
 import { appTable, link, userAccess } from '../entities'
 import {jwtVerify} from '../auths/validJWT'
@@ -9,7 +10,7 @@ import baseHandle from '../utils/methodsHandler'
 // import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
 // import { getJWTobject } from '../auths/validJWT'
 // import JSON5 from 'json5'
-import type {ValidationResp} from '../funcs/validations'
+import type {ValidationResp} from './validations'
 import { respSelector, jsonResp }from '../utils/SRetFormat'
 
 import validate from './validations'

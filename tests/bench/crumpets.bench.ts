@@ -1,6 +1,6 @@
 import behch from 'benchmark'
 import type {Event} from 'benchmark'
-import crumpet from '../../src/utils/crumpetBakery'
+import crumpet from '../../server/utils/crumpetBakery'
 
 const suite = new behch.Suite()
 

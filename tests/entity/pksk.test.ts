@@ -10,8 +10,8 @@ import {
   linkClickCountsByYear,
   user,
   userAccess
-} from '../../src/entities'
-import dateFmt from '../../src/utils/dateFmt'
+} from '../../server/entities'
+import dateFmt from '../../server/utils/dateFmt'
 
 type Dict<T> = {[key:string]:T}
 interface DynamoDBGetInputs{

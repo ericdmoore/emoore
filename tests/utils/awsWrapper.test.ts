@@ -2,7 +2,7 @@
  * @see: https://us-west-2.console.aws.amazon.com/lambda/home?region=us-west-2#/functions/RealWrapperTestUtil?tab=code
  */
 
-import {runOnLambda} from '../../src/utils/aws-lambda-wrapper'
+import {runOnLambda} from '../../server/utils/aws-lambda-wrapper'
 import {Lambda, Credentials, SharedIniFileCredentials} from 'aws-sdk'
 
 const credentials = new SharedIniFileCredentials({profile:'personal_default'})

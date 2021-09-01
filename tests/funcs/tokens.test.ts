@@ -10,14 +10,14 @@ Overview
 * DELE :: token -> confimationMessage
 */
 
-import type { SRet } from '../../src/types'
-import handler from '../../src/funcs/tokens'
-import { user, appTable } from '../../src/entities'
+import type { SRet } from '../../server/types'
+import handler from '../../server/funcs/tokens'
+import { user, appTable } from '../../server/entities'
 import { event, ctx } from '../gatewayData'
 import { nanoid } from 'nanoid'
-import { userLookup } from '../../src/entities/userLookup'
-import { atob } from '../../src/utils/base64'
-import { jwtSign, jwtVerify } from '../../src/auths/validJWT'
+import { userLookup } from '../../server/entities/userLookup'
+import { atob } from '../../server/utils/base64'
+import { jwtSign, jwtVerify } from '../../server/auths/validJWT'
 import { authenticator } from 'otplib'
 
 const userList = [

@@ -1,6 +1,6 @@
 /* globals test expect */
 
-import { handler } from '../../src/funcs/root'
+import { handler } from '../../server/funcs/root'
 import { event, ctx } from '../gatewayData'
 
 test('basic root test', async () => {

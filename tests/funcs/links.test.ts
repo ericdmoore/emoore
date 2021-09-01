@@ -1,12 +1,12 @@
 /* globals describe test expect beforeEach afterEach beforeAll afterAll */
-import type { SRet, Evt } from '../../src/types'
+import type { SRet, Evt } from '../../server/types'
 
-import handler from '../../src/funcs/links'
+import handler from '../../server/funcs/links'
 import { event, ctx } from '../gatewayData'
-import { jwtSign } from '../../src/auths/validJWT'
+import { jwtSign } from '../../server/auths/validJWT'
 import { nanoid } from 'nanoid'
-import { appTable, user, link, userLookup, ILink, userAccess } from '../../src/entities'
-import type {MetaResp} from '../../src/types'
+import { appTable, user, link, userLookup, ILink, userAccess } from '../../server/entities'
+import type {MetaResp} from '../../server/types'
 
 const {rotates, expires} = link.dynamicConfig
 

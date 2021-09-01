@@ -1,6 +1,6 @@
 /* globals test expect describe beforeAll afterAll */
-import { user } from '../../src/entities/'
-import { appTable } from '../../src/entities/entities'
+import { user } from '../../server/entities'
+import { appTable } from '../../server/entities/entities'
 import { authenticator } from 'otplib'
 import bcrypt from 'bcrypt'
 
