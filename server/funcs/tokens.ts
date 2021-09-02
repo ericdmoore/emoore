@@ -199,12 +199,11 @@ export const get: IFunc = async (e, c) => validatedGET(e, c)
 /**
  * POST :: loginInfo -> starterToken -> (+2FA)-> token
  * StarterToken = token(email)
- * FinalToken = StarterToken + H>Q>C(TFAType + TFAchallengeResp + sig)
  * @param e Event from Gateway
  * @param e.[[headers][queryStringParameters][cookies]].email
+ * @param e.[[headers][queryStringParameters][cookies]].p
  * @param e.[[headers][queryStringParameters][cookies]].TFAchallengeResp
  * @param e.[[headers][queryStringParameters][cookies]].TFAtype
- * @param e.[[headers][queryStringParameters][cookies]].sig
  * @param c Context
  */
 export const post: IFunc = async (e, c) => validatedPOST(e, c)

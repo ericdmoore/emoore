@@ -7,14 +7,14 @@ GET POST PUT DEL /expand/path
 input: /shortpath
 
 */
-import type { IFunc, Responder, SRet, Evt, JWTelementsExtras } from '../types'
+import type { IFunc, Responder } from '../types'
 import baseHandle from '../utils/methodsHandler'
 import validate from './validations'
 import { respSelector, jsonResp }from '../utils/SRetFormat'
 
-import { appTable, link, userAccess } from '../entities'
-import {jwtVerify} from '../auths/validJWT'
-import type { ILink, DynamicKind} from '../entities/links'
+import { link } from '../entities'
+// import {jwtVerify} from '../auths/validJWT'
+// import type { ILink, DynamicKind} from '../entities/links'
 
 const compressableJson = respSelector(jsonResp)
 
