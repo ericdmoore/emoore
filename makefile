@@ -30,6 +30,9 @@ deploy:
 
 preflight: build show-extras rm-build test
 
+postflight: 
+	npx jest tests-post-deploy
+
 schema-gen: 
 	npx ts-node server/models/mergeSchemas.ts
 
@@ -61,6 +64,9 @@ tests-show-skip:
 tests-show-more: tests-show-todo tests-show-skip
 	@echo ""
 	@echo "> #Showing All Unfinished Tests"
+
+test-post-deploy:
+	npx esbuild --bundle client/post-deploy-test.ts | node
 
 list:
 	@echo 

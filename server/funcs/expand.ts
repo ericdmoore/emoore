@@ -12,7 +12,7 @@ import fastgeoip from 'fast-geoip'
 import {IResult, UAParser} from 'ua-parser-js'
 import {click} from '../entities'
 import {intervalToDuration} from 'date-fns'
-
+import {handler as root} from '../funcs/root'
 const compressableJson = respSelector(jsonResp)
 
 // #region types
@@ -225,7 +225,7 @@ const collapseGeos = (link:Readonly<ILink>,
         const u = urls[directMaetch].url
         return typeof u === 'string' ? u : dynamciPicker(link, u,event, history)
     }else{
-        const catchAllMatch = listOfGeos.findIndex((v,i)=>v.toLowerCase() === '*') // shift,8
+        const catchAllMatch = listOfGeos.findIndex((countyryCode)=>countyryCode.toLowerCase() === '*')
         if(catchAllMatch !== -1){
             const u = urls[catchAllMatch].url
             return typeof u === 'string' ? u : dynamciPicker(link, u, event, history)
@@ -256,10 +256,11 @@ const collapseExpires = (link:Readonly<ILink>,
     event:Readonly<ExpandLinkEvent>, 
     history: Readonly<ExpandLinkHistory>
 ):string=>{
-    const expirationTimes = urls.map(u=> u.at) // already a cdf
-   
-    const idx = expirationTimes.findIndex( timeOfExpiry => timeOfExpiry - Date.now() >= 0)
-    if(idx !== -1){
+    const expirationTimes = [...urls].sort((a,z)=>a.at - z.at).map(u => u.at) // sorting it makes it a monotonic cdf
+    const expTime = expirationTimes.find( timeOfExpiry => timeOfExpiry - Date.now() >= 0)
+    
+    if(expTime){
+        const idx = urls.findIndex(v => v.at === expTime)
         const u = urls[idx].url
         return typeof u ==='string' ? u : dynamciPicker(link, u, event, history)
     }else{
@@ -273,20 +274,28 @@ const collapseHurdles = (link:Readonly<ILink>,
     urls:Readonly<UrlSwitchAt<number>[]>, 
     event:Readonly<ExpandLinkEvent>, 
     history: Readonly<ExpandLinkHistory>
-):string=>{
-    // as allTime gets BIG
-    // it guarentees that we will choose the last AT value/idx
-    const idx = cdfify(
-                    urls.map(u=>u.at)
-                )
-                .findIndex(cdfV => cdfV - history.allTimeExpansions > 0)
-    if(idx !==-1){
-        const u = urls[idx].url
-        return typeof u === 'string' ? u : dynamciPicker(link, u, event, history)
-    }else{
-        // should never need this
-        return link.long
-    }
+):string => {
+    // (+ 1) is for the current click being processed
+    const allTimeWithNow = 1+ history.allTimeExpansions
+
+    const cdf = cdfify(urls.map(u=>u.at)) // do not sort
+    const idx = cdf
+        .map((cdfI, i) => ({ cdfI, i, diff: allTimeWithNow - cdfI }))
+        .filter(v => v.diff >=0 ) // postive
+        .reduce((p,c) =>  // min diff
+            p.diff <= c.diff ? p : c
+        ,{ diff:Infinity, cdfI:0, i:0 })
+    
+    // console.log({
+    //     idx, 
+    //     allTimeWithNow,
+    //     cdfDiff : cdf.map((cdfI, i)=> ({i, cdfI, diff: allTimeWithNow - cdfI })),
+    // })
+
+    const u = urls[idx.i].url
+    // console.log({ retruning: u, allTimeWithNow })
+    return typeof u === 'string' ? u : dynamciPicker(link, u, event, history)
+    
 }
 
 const collapseKeepalive = (link:Readonly<ILink>, 
@@ -294,6 +303,19 @@ const collapseKeepalive = (link:Readonly<ILink>,
     event:Readonly<ExpandLinkEvent>, 
     history: Readonly<ExpandLinkHistory>
 ):string=>{
+    const clickDist  = Date.now() - history.lastClick
+
+    // dist = 9
+    // [{at: 10}, {at: 100}, {at: 1000}]
+    //
+    // if last time the link was clicked, it was N ms away from Now - so then determine which link is HOT
+    // N == 5ms
+    // N == 50ms
+    // N == 500ms
+    // N == 5000ms
+    // 
+    //
+    //////
     // time since last click
     // keeps us alive
     // when the time sreads out... the tail/links are ready for fewer clicks.
@@ -351,11 +373,12 @@ export const validatedGET:IFunc = async (event, ctx) => {
     const short = event.pathParameters?.short
     const found = await link.get({short}).catch( er => null)
 
-    // console.log('event')
-    // console.dir(event)    
-    // console.log({short, found})
-
-    return validate(
+    if(!short){
+        // not provided
+        return root(event, ctx)
+    }else{
+        // provided, but not found
+        return validate(
             getResponder, 
             {found},
             async (e,c,d)=>{
@@ -370,6 +393,7 @@ export const validatedGET:IFunc = async (event, ctx) => {
                 }
             }
         )(event,ctx)
+    }
 }
 
 /**
@@ -412,48 +436,6 @@ export const getResponder: Responder<{found:ILink}> = async (d, e, c, extras) =>
     return ret
 }
 
-
-// export const validatedPOST:IFunc = async (event, ctx) => {
-//     return validate(postResponder, {})(event,ctx)
-// }
-
-// export const postResponder: Responder<{}> = async (d, e, c, extras) => {
-//     return {
-//     statusCode:200,
-//     ...await compressableJson()(e,{
-//         links : await link.batch.get([])
-//     }),
-//     } as SRet
-// }
-
-// export const validatedPUT:IFunc = async (event, ctx) => {
-//     return validate(putResponder, {})(event,ctx)
-// }
-
-// export const putResponder: Responder<{}> = async (d, e, c, extras) => {
-//     return {
-//     statusCode:200,
-//     ...await compressableJson()(e,{
-//         links : await link.batch.get([])
-//     }),
-//     } as SRet
-// }
-
-// export const validatedDELE:IFunc = async (event, ctx) => {  
-//     return validate(
-//       deleResponder, 
-//       {},
-//     )(event, ctx)
-//   }
-  
-// export const deleResponder:Responder<{}> = async (d, e, c, extras) => {
-//     return {
-//         statusCode:200,
-//         ...await compressableJson()(e,{
-//             links : await link.batch.get([])
-//         }),
-//     } as SRet
-// }  
 
 export const get: IFunc = validatedGET
 export const post: IFunc = validatedGET

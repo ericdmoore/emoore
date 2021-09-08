@@ -1,5 +1,7 @@
 import type {ClickInputs} from '../../server/entities/clicks'
 import type {ExpandLinkHistory} from '../../server/funcs/expand'
+import type { APIGatewayProxyStructuredResultV2 } from 'aws-lambda'
+
 
 import {nanoid} from 'nanoid'
 import { addDays, addWeeks, addMonths} from 'date-fns'
@@ -7,6 +9,8 @@ import handler,{getLinkHistory} from '../../server/funcs/expand'
 import {link, click, user, appTable, userAccess} from '../../server/entities'
 import {event, ctx, RequestContext} from '../gatewayData'
 // import type {BatchCreateElem}from '../../src/entities'
+import {sleep} from '../../server/utils/time'
+
 
 const { geos, rotates, expires, hurdles, keepalive } = link.dynamicConfig
 const {log} = console
@@ -99,29 +103,54 @@ describe('Expand Link Data Setup',()=>{
         // 4
         {   short: nanoid(5), // 5
             long:'https://ericdmoore.com/4',
-            ownerUacct: preLoadedUsers[0].uacct
+            ownerUacct: preLoadedUsers[0].uacct,
+            dynamicConfig: geos([
+                {at:"DE",url:"t.co/DE"},
+                {at:"*", url:"t.co/default"},
+                {at:"US",url: rotates([
+                        {at:1, url:'https://t.co/1'},
+                        {at:2, url:'https://t.co/2'},
+                        {at:3, url:'https://t.co/3'},
+                        {at:4, url:'https://t.co/4'},
+                    ])
+                }
+            ])
         },
         // 5
         {   short: nanoid(5), // 6
             long:'https://ericdmoore.com/5',
-            ownerUacct: preLoadedUsers[0].uacct
+            ownerUacct: preLoadedUsers[0].uacct,
+            dynamicConfig: keepalive([
+                {at:11, url:'wontwork1'},
+                {at:11, url:'wontwork2'}
+            ])
         },
         // 6
         {   short: nanoid(5), // 7
             long:'https://ericdmoore.com/6',
-            ownerUacct: preLoadedUsers[0].uacct
+            ownerUacct: preLoadedUsers[0].uacct,
+            dynamicConfig: expires([
+                {at: now.getTime() - 4*DAYS_OF_MS, url:'https://t.co/1.exp4dago'},
+                {at: now.getTime() - 3*DAYS_OF_MS, url:'https://t.co/2.exp3dago'},
+                {at: now.getTime() - 2*DAYS_OF_MS, url:'https://t.co/3.exp2dago'},
+                {at: now.getTime() - 1*DAYS_OF_MS, url:'https://t.co/4.exp1dago'},
+            ])
         },
         // 7
         {   short: nanoid(5), // 8
             long:'https://ericdmoore.com/7',
-            ownerUacct: preLoadedUsers[0].uacct
+            ownerUacct: preLoadedUsers[0].uacct,
+            dynamicConfig: hurdles([
+                {at:9, url:'http://t.co/atleast9clicks'},
+                {at:1, url:'http://t.co/the10thClick'},
+                {at:1, url:'http://t.co/atleast1click'}
+            ])
         },
         // 8
         {   short: nanoid(5), // 9
             long:'https://ericdmoore.com/8',
             ownerUacct: preLoadedUsers[0].uacct
         },
-
     ]
 
     const clicksForEachLinkGoingBackByDays = linkDefs.map( 
@@ -179,12 +208,7 @@ describe('Expand Link Data Setup',()=>{
     })
     // #endregion preamble
 
-    test.todo('228--233')
-    test.todo('259--268')
-    test.todo('279--288')
-    test.todo('311--312')
-
-    test('Expand Link History', async ()=>{
+    test('Link[8]: Expand Link History', async ()=>{
         const i = 8
         const link = linkDefs[i]
         const {short, long} = link
@@ -218,7 +242,7 @@ describe('Expand Link Data Setup',()=>{
         expect(Object.values(hist.monthsAgo)).toEqual([1,1,1])
     })
     
-    test('Basic Expansion /1', async ()=>{
+    test('Link[0]: Basic Expansion ', async ()=>{
         const e = event('GET',
             '/expand/', 
             { http: { sourceIp:ipAddrs[0] } },
@@ -234,7 +258,7 @@ describe('Expand Link Data Setup',()=>{
         expect(resp.headers?.Location).toEqual('https://ericdmoore.com/1')
     })
 
-    test('Basic Expansion /2', async ()=>{
+    test('Link[1]: Basic Expansion ', async ()=>{
         const e = event('GET', '/expand/', 
             { http: { sourceIp:ipAddrs[0] } },
             { short: linkDefs[1].short }
@@ -249,7 +273,7 @@ describe('Expand Link Data Setup',()=>{
         expect(resp.headers?.Location).toEqual('https://ericdmoore.com/2')
     })
 
-    test('Expansion Dynamic Link (already 3 clicks)', async ()=>{
+    test('Link[2]: Expansion Dynamic  (already 3 clicks)', async ()=>{
         const e = event('GET', '/expand/', 
             { http: { sourceIp:ipAddrs[0] } },
             { short: linkDefs[2].short }
@@ -264,7 +288,7 @@ describe('Expand Link Data Setup',()=>{
         expect(resp.headers?.Location).toEqual('https://t.co/3')
     })
 
-    test('Expansion Dynamic Link (with 6 prior clicks)', async ()=>{
+    test('Link[3]: Expansion Dynamic Link (with 6 prior clicks)', async ()=>{
         // console.log("race condition?")
 
         const link = linkDefs[3]
@@ -297,20 +321,13 @@ describe('Expand Link Data Setup',()=>{
         expect(resp.headers?.Location).toEqual('https://t.co/4')
     })
 
-    test.skip('Expansion Dynamic Link (Click:6)', async ()=>{
+    test('Link[4]: Expand a Geo Link that uses a CATCH_ALL / Wildcard?', async()=>{
+        // 2 is in use
+        // change to 4?
         const e = event('GET', '/expand/', 
-            { http: { sourceIp:ipAddrs[0] } },
+            { http: { sourceIp:'1.1.1.1' } }, /* 1.1.1.1 is supposed to eval to AU which is undefined */
             { short: linkDefs[4].short }
         )
-        await click.batch.save( Array.from({length:4},(_,i)=>
-            ({
-                ip: e.requestContext.http.sourceIp,
-                long: linkDefs[2].long,
-                short: linkDefs[2].short,
-                useragent: uaList[0],
-                cts: now,
-            }) 
-        ))
 
         const resp = await handler(e,ctx)
 
@@ -318,39 +335,96 @@ describe('Expand Link Data Setup',()=>{
         expect(resp).toHaveProperty('statusCode', 307)
         expect(resp).toHaveProperty('isBase64Encoded',false)
         expect(resp.headers).toHaveProperty('Location')
-        expect(resp.headers?.Location).toEqual('https://t.co/3')
+        expect(resp.headers?.Location).toEqual('t.co/default')    
     })
 
-    test.skip('Expansion Dynamic Link (Click:10)', async ()=>{
-        const link = linkDefs[5]
-
+    test('Link[5]: Expand a keepalive link (or remove the option)',async()=>{
         const e = event('GET', '/expand/', 
-            { http: { sourceIp:ipAddrs[0] } },
-            { short: link.short }
+            { http: { sourceIp:'1.1.1.1' } }, /* 1.1.1.1 is supposed to eval to AU which is undefined */
+            { short: linkDefs[5].short }
         )
-        await nineTimesBefore(()=>handler(e,ctx))
+
         const resp = await handler(e,ctx)
 
         expect(resp).toHaveProperty('headers')
         expect(resp).toHaveProperty('statusCode', 307)
         expect(resp).toHaveProperty('isBase64Encoded',false)
         expect(resp.headers).toHaveProperty('Location')
-        expect(resp.headers?.Location).toEqual('https://t.co/4')
+        expect(resp.headers?.Location).toEqual('https://ericdmoore.com/5')    
+        
     })
 
-    test.skip('Expansion Dynamic Link (Click:11)', async ()=>{
-        const link = linkDefs[6]
+    test('Link[6]: Expand an expiring link',async()=>{
         const e = event('GET', '/expand/', 
-            { http: { sourceIp:ipAddrs[0] } },
-            { short: link.short }
+            { http: { sourceIp:'1.1.1.1' } }, /* 1.1.1.1 is supposed to eval to AU which is undefined */
+            { short: linkDefs[6].short }
         )
-        await tenTimesBefore(()=>handler(e,ctx))
+
         const resp = await handler(e,ctx)
 
         expect(resp).toHaveProperty('headers')
         expect(resp).toHaveProperty('statusCode', 307)
         expect(resp).toHaveProperty('isBase64Encoded',false)
         expect(resp.headers).toHaveProperty('Location')
-        expect(resp.headers?.Location).toEqual('https://t.co/1')
+        // all expired
+        expect(resp.headers?.Location).toEqual('https://ericdmoore.com/6')    
     })
+
+    const dealingWithRaceCondition = (resp: APIGatewayProxyStructuredResultV2)=>{
+        const hist = JSON.parse(resp.headers?.['X-History'] as string | undefined  ?? 'null') as ExpandLinkHistory
+        
+        if(Object.keys(hist).length ===0 ){
+            expect(true).toBe(false) // should not happen
+        }else{
+            // console.log({ allTimeClicks: hist.allTimeExpansions, url: resp.headers?.Location })
+            switch(hist.allTimeExpansions){
+                case 8:
+                    expect(resp.headers?.Location).toEqual('http://t.co/atleast9clicks')
+                    break;
+                case 9: // 9clicks before THIS - means we just did the 10th click
+                    expect(resp.headers?.Location).toEqual('http://t.co/the10thClick')
+                    break;
+                case 10:
+                    expect(resp.headers?.Location).toEqual('http://t.co/atleast1click') 
+                    break;
+                default:                
+                    expect(true).toBe(false) // should never happen
+                    break;
+            }
+        }       
+    }
+
+    test('Link[7]: Expand a Hurdle Link',async()=>{
+        const link = linkDefs[7]
+        const short = link.short
+        const e = event('GET', '/expand/',  { http: { sourceIp:'1.1.1.1' } }, { short } )
+
+        // from pre-handler
+        // const prehist = await getLinkHistory(short)
+        // console.log('prehist:',prehist)
+        
+        // handler side-effects
+        const resp1 = await handler(e,ctx) // 9th click
+        // for race conditions in DB
+        // await sleep(400)
+        
+        const resp2 = await handler(e,ctx) //10th click
+        
+        // for race conditions in DB
+        // await sleep(400)
+        
+        const resp3 = await handler(e,ctx) //11th click
+        
+        expect(resp1).toHaveProperty('headers')
+        expect(resp1).toHaveProperty('statusCode', 307)
+        expect(resp1).toHaveProperty('isBase64Encoded',false)
+        expect(resp1.headers).toHaveProperty('Location')
+        expect(resp1.headers?.Location).toEqual('http://t.co/atleast9clicks')
+        
+        // DB consistency issues createa race condition going fast for tests
+        dealingWithRaceCondition(resp2)
+        dealingWithRaceCondition(resp3)
+    })
+    
 })
+

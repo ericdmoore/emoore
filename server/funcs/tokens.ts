@@ -160,7 +160,7 @@ export const validatedGET:IFunc = async (e, c) => {
   // console.log('1.validateGET', { jwtUser, creds })
 
   const auzhZData = {
-    ...pluckCredentialsFromEvent(e),
+    ...creds,
     ...jwtUser
   } as IAuthzFlat
 

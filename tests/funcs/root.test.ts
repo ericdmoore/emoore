@@ -5,10 +5,11 @@ import { event, ctx } from '../gatewayData'
 
 test('basic root test', async () => {
   const r = await handler(event('GET', '/'), ctx)
-  expect(r).toStrictEqual({
+  expect(r).toEqual({
     statusCode: 300,
     headers: {
-      Location: 'http://im.ericdmoore.com'
+      Location: 'http://im.ericdmoore.com',
+      "X-Developer": "https://github.com/ericdmoore/emoore/wiki",
     }
   })
 })

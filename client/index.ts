@@ -1,4 +1,9 @@
-import ky from 'ky'
+// import ky from 'ky'
+// import ky from 'ky-universal';
+import ky from 'got'
+import {Response} from 'got'
+import { refreshToken } from '../server/auths/validJWT'
+import {atob} from '../server/utils/base64'
 
 interface TokenInputUSerCreds{
     email:string
@@ -13,77 +18,155 @@ interface TokenInputStartedToken{
 
 type TokenInput = TokenInputStartedToken | TokenInputUSerCreds
 
+const refreshAuthToken = (authToken:string, r: Response)=>{
+    if(authToken ==='missing'){
+        return r.headers['authToken'] as string|undefined ?? 'missing'
+    }else{
+        if(r.headers['authToken']){
+            return r.headers['authToken'] as string
+        }else{
+            return authToken
+        }
+    }
+}
+
 export const client = (baseURL:string)=>{
     let authToken: string = 'missing'
 
-    const postTokens =  (tokenResouce:string)=>(input: TokenInput)=>{
+    const resNames =  {
+        tokens: 'tokens',
+        links: 'links',
+        users: 'users',
+        expand: 'expamnd',
+        stats: 'stats',
+    }
+
+    const postTokens =  (tokenResouce:string)=>async (input: TokenInput)=>{
+        let r: Response
         if('email' in input){
-            return ky.post(`${baseURL}/${tokenResouce}`,{headers:{
+            r = await ky.post(`${baseURL}/${tokenResouce}`,{headers:{
                 email: encodeURIComponent(input.email),
-                p: encodeURIComponent(input.passphrase),
+                p: atob(input.passphrase),
                 TFAchallengeResp: encodeURIComponent(input.TFA),
                 TFAtype: encodeURIComponent(input.TFAtype ?? 'TOTP' ),
             }})
         }else{
-            return ky.post(`${baseURL}/${tokenResouce}`,{headers:{
+            r = await ky.post(`${baseURL}/${tokenResouce}`,{headers:{
                 authToken: input.starterToken
             }})
         }
+        authToken = refreshAuthToken(authToken, r)
+        return r
     }
+
+ 
+
     const tokens = {
-        resource:'tokens',
-        get: async (user:string, pass:string, TFA:string)=>fetch(baseURL + tokens.resource,{ method:'GET', headers:{ authToken } }),
+        get: async (input:TokenInputUSerCreds    | {token:string}) => {
+            const r = await ky.get(baseURL + resNames.tokens, { 
+                headers:{ 
+                    ...('token' in input 
+                        ? {authToken: input.token} 
+                        : {
+                            email: encodeURIComponent(input.email),
+                            p: atob(input.passphrase),
+                            TFAchallengeResp: encodeURIComponent(input.TFA),
+                            TFAtype: encodeURIComponent(input.TFAtype ?? 'TOTP' ),
+                        }) 
+                    } 
+                })
+            authToken = refreshAuthToken(authToken, r)
+            return r
+        },
         put: postTokens('tokens'),
         post: postTokens('tokens'),
         del:  postTokens('tokens'),
     }
 
     const expand = {
-        resource:'expand',
-        get: (short:string)=>ky.get(`${baseURL}/${expand.resource}/${short}`,{headers:{authToken}}),
+        get: async (short:string)=>{
+            const r = await ky.get(`${baseURL}/${resNames.expand}/${short}`,{headers:{authToken}})
+            authToken = refreshAuthToken(authToken, r)
+            return r
+        },
         // put:()=>ky.put(`${baseURL}/${expand.resource}`,{headers:{authToken}}),
         // post:()=>ky.post(`${baseURL}/${expand.resource}`,{headers:{authToken}}),
         // del:()=>ky.delete(`${baseURL}/${expand.resource}`,{headers:{authToken}})
     }
 
     const stats = {
-        resource:'stats',
-        get: ()=>ky.get(`${baseURL}/${stats.resource}`,{headers:{authToken}}),
+        get: async ()=>{
+            const r = await ky.get(`${baseURL}/${resNames.stats}`,{headers:{authToken}})
+            authToken = refreshAuthToken(authToken, r)
+            return r
+        },
         // put:()=>ky.put(`${baseURL}/${stats.resource}`,{headers:{authToken}}),
         // post:()=>ky.post(`${baseURL}/${stats.resource}`,{headers:{authToken}}),
         // del:()=>ky.delete(`${baseURL}/${stats.resource}`,{headers:{authToken}})
     }
 
     const links = {
-        resource:'links',
-        get: ()=>ky.get(`${baseURL}/${links.resource}`,{headers:{authToken}}),
-        put:()=>ky.put(`${baseURL}/${links.resource}`,{headers:{authToken}}),
-        post:()=>ky.post(`${baseURL}/${links.resource}`,{headers:{authToken}}),
-        del:()=>ky.delete(`${baseURL}/${links.resource}`,{headers:{authToken}}),
+        get: async () => {
+            const r = await ky.get(`${baseURL}/${resNames.links}`,{headers:{authToken}})
+            authToken = refreshAuthToken(authToken, r)
+            return r
+        },
+        put: async () => {
+            const r = await ky.put(`${baseURL}/${resNames.links}`,{headers:{authToken}} )
+            authToken = refreshAuthToken(authToken, r)
+            return r
+        },
+        post:async() => {
+             const r = await ky.post(`${baseURL}/${resNames.links}`,{headers:{authToken}})
+             authToken = refreshAuthToken(authToken, r)
+             return r
+        },
+        del: async () => {
+            const r = await ky.delete(`${baseURL}/${resNames.links}`,{headers:{authToken}})
+            authToken = refreshAuthToken(authToken, r)
+            return r
+        },
     }
 
     const users = {
-        resource:'users',
-        get: async ()=>ky.get(`${baseURL}/${users.resource}`, { headers: {authToken}} ),
-        put:()=>ky.put(`${baseURL}/${users.resource}`, { headers: {authToken}} ),
-        post:()=>ky.post(`${baseURL}/${users.resource}`, { headers: {authToken}, json:{} } ),
-        del:()=>ky.delete(`${baseURL}/${users.resource}`, { headers: {authToken}} ),
+        get:  async ()=>{
+            const r = await ky.get(`${baseURL}/${resNames.users}`, { headers: {authToken}} )
+            authToken = refreshAuthToken(authToken, r)
+            return r
+        },
+        put:  async ()=>{
+            const r = await ky.put(`${baseURL}/${resNames.users}`, { headers: {authToken}} )
+            authToken = refreshAuthToken(authToken, r)
+            return r
+        },
+        post: async ()=>{
+            const r = await ky.post(`${baseURL}/${resNames.users}`, { headers: {authToken}, json:{} } )
+            authToken = refreshAuthToken(authToken, r)
+            return r
+        },
+        del:  async ()=>{
+            const r = await ky.delete(`${baseURL}/${resNames.users}`, { headers: {authToken}} )
+            authToken = refreshAuthToken(authToken, r)
+            return r
+        },
     }
+    const root = ()=>ky.get(baseURL)
 
     return {
         get: {
             users: users.get,
             expand: expand.get,
             stats: stats.get,
-            links: links.get
-        },
-        put:{
-            tokens: tokens.put,
-            links: links.put
+            links: links.get,
+            tokens: tokens.get
         },
         post: {
             tokens: tokens.post,
             links: links.post
+        },
+        put:{
+            tokens: tokens.put,
+            links: links.put
         },
         del: {
             users: users.del,
@@ -94,59 +177,9 @@ export const client = (baseURL:string)=>{
         stats, 
         links,
         users,
+        root,
+        authToken
     }
 }
 
-
-
-/**
- * 
- * import emC from ''
- * 
- * let r = await emC('https://somethingAwesome.com').root()
- * const emoore = await emC('https://somethingAwesome.com').cfg(r)
- * 
- * emoore.get.token()
- * emoore.get.user()
- * 
- * emoore.put.token()
- * emoore.post.token()
- * emoore.del.token()
- * 
- * emoore.get.expand()
- * emoore.get.stats()
- * 
- * emoore.post.links()
- * emoore.get.links()
- * emoore.put.links()
- * emoore.del.links()
- * 
- */
-
-
-/**
- * 
- * To get a token, give your [user,pass,2FA] get back a token
- * Almost all Functions authenticate via token passed in via [H>Q>C]
- * Each call, amnde with a valid token, auto-refreshes/extends your tokens expiration
- * 
- * client(baseURL){
- * 
- *  const tokens = {get, post, put, del}
- *  const users  = {get, post, put, del}
- *  const links  = {get, post, put, del}
- *  const expand  = {get}
- *  const stats  = {get, post, put, del}
- * 
- *  return {
- *      get: ('GET', getResources )=>{},
- *      put: ('PUT, putResources )=>{},
- *      post: ('POST', postResources)=>{},
- *      del: ('DELETE', postResources)=>{},
- *      root: ()=>{}
- *  }
- * } 
- * 
- * 
- * 
- */
+export default client
