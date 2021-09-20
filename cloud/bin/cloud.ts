@@ -25,36 +25,23 @@ interface APIconfigs{
   }
 }
 
-interface FnReadyForGateway{
+interface GatewaySrcConfig{
   src:string[],
   path:string,
   methods: apigV2.HttpMethod[],
-  fn:lambda.Function
 }
+
+type FnReadyForGateway = GatewaySrcConfig & {fn:lambda.Function}
+  
 // #endregion interfaces
 
-// func mamnifest
-
-const funcs = {
-  // pattern
-  // funcID: {src: path: methods?: apigV2.HttpMethod[], authorizer?: apigV2.IHttpRouteAuthorizer}
-  clicks: { path: '/clicks', src: ['clicks.ts'], methods: [apigV2.HttpMethod.ANY] },
-  expand: { path: '/expand', src: ['clicks.ts'], methods: [apigV2.HttpMethod.ANY] },
-  links: { path: '/links', src: ['links.ts'], methods: [apigV2.HttpMethod.ANY] },
-  root: { path: '/', src: ['root.ts'], methods: [apigV2.HttpMethod.GET] },
-  stats: { path: '/stats', src: ['clicks.ts'], methods: [apigV2.HttpMethod.ANY] },
-  tokens: { path: '/tokens', src: ['tokens.ts'], methods: [apigV2.HttpMethod.ANY] },
-  users: { path: '/users', src: ['users.ts'], methods: [apigV2.HttpMethod.ANY] },
-  // graphql: { path: '/graphql', src: ['graphql.ts'], methods: [apigV2.HttpMethod.GET, apigV2.HttpMethod.POST] }
+// FUNC MANIFEST
+const modules = ['clicks','links','stats','tokens','users']
+const init: {[routeName:string]:GatewaySrcConfig} = {
+  root:   { path: '/',               src: ['root.ts'],   methods: [apigV2.HttpMethod.GET] },
+  expand: { path: '/expand/{short}', src: ['expand.ts'], methods: [apigV2.HttpMethod.GET] },
 }
-
-/*
-
-links
-users
-clicks
-
-*/
+const funcs = modules.reduce((p,c)=>({ ...p, [c] : {path:`/${c}`, src:[`${c}.ts`], methods: [apigV2.HttpMethod.ANY]} }), init)
 
 ;(async () => {
   const app = new cdk.App()
@@ -71,8 +58,8 @@ clicks
 
   const funcMap = await new Functions(cdkStack, 'id', 'dist')
     .addMoreFuncs(basePaths, funcs)
-    .makeLambdas({}, {
-      external: ['mock-aws-s3', 'nock'],
+    .bundleLambdas({}, {
+      external: ['aws-sdk','mock-aws-s3', 'nock'],
       define: {
         'process.env.AWS_KEY': `"${processenv.AWS_KEY}"`,
         'process.env.AWS_SECRET': `"${processenv.AWS_SECRET}"`
@@ -81,14 +68,19 @@ clicks
 
   const fns = Object.entries(funcs).reduce((p, [fnID, val]) => ({
     ...p,
-    [fnID]: { ...val, fn: funcMap[fnID] }
+    [fnID]: { 
+      ...val, 
+      fn: funcMap[fnID] 
+    }
   }), {} as {[fnID:string]:FnReadyForGateway})
 
   const api = new APIGateway(cdkStack, 'APIGateway', {
     name: 'emoore API Gateway',
     desc: 'The Gateway for emoore functions'
   })
+  
   api.mergeRouteFunctions(fns)
+  cdkStack.grant(fns)
 
   // cdkStack.table.grantReadWriteData(funcMap.graphql)
 

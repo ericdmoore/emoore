@@ -1,22 +1,23 @@
 import type { IFunc, Responder, SRet } from '../types'
 import type { ILink, DynamicKind, UrlSwitchAt} from '../entities/links'
 import type {DocumentClient} from 'aws-sdk/clients/dynamodb'
-
-import baseHandle from '../utils/methodsHandler'
-import validate from './validations'
-import { respSelector, jsonResp }from '../utils/SRetFormat'
-import { link, linkClickCountsByDay } from '../entities'
+import type {IResult} from 'ua-parser-js'
 
 import HTTPstatusCodes from '../enums/HTTPstatusCodes'
+
+import baseHandle from '../utils/methodsHandler'
+import { handler as root } from '../funcs/root'
+import { link,click } from '../entities'
+import validate from './validations'
+import { respSelector, jsonResp }from '../utils/SRetFormat'
+
 import fastgeoip from 'fast-geoip'
-import {IResult, UAParser} from 'ua-parser-js'
-import {click} from '../entities'
+import {UAParser} from 'ua-parser-js'
 import {intervalToDuration} from 'date-fns'
-import {handler as root} from '../funcs/root'
+
 const compressableJson = respSelector(jsonResp)
 
 // #region types
-
 
 type Union1toSeven = '1' | '2' | '3' | '4' | '5' | '6' | '7' 
 type Union1toFour  = '1' | '2' | '3' | '4'
@@ -373,6 +374,8 @@ export const validatedGET:IFunc = async (event, ctx) => {
     const short = event.pathParameters?.short
     const found = await link.get({short}).catch( er => null)
 
+    // console.log({ short, found })
+    
     if(!short){
         // not provided
         return root(event, ctx)

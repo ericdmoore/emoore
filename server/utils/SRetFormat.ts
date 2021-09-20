@@ -1,7 +1,15 @@
 import type { Evt, SRet } from '../types'
-import type { JsonLdDocument, ContextDefinition } from 'jsonld'
+
+// Eric Moore - Fri Sep 10 10:39:45 CDT 2021
+//
+// JSON LD package requires esm - which is not playing niceley with esbuild.
+// so since its it not used by anything except perhaps tests,
+// I am yanking it from this util file
+//
+// import type { JsonLdDocument, ContextDefinition } from 'jsonld'
+// import { compact, flatten } from 'jsonld'
+
 import { gzip, brotliCompress, deflate } from 'zlib'
-import { compact, flatten } from 'jsonld'
 import { lookup } from 'mime'
 
 type PromiseOr<T> = Promise<T> | T
@@ -64,104 +72,102 @@ const brotliP = async (i:PromiseOr<NoStatusSRet>):Promise<NoStatusSRet> => {
     isBase64Encoded: true
   }
 }
-
+``
 // #endregion compasbale-compressors
 
-export const respSelector = <T extends string | object>(fmtBody:(i:T)=>Promise<NoStatusSRet>, characterThreshold = 800) => 
-( defaultReturnValue:Partial<NoStatusSRet> = 
-    { headers: {
-      'Access-Control-Allow-Origin':'*',
-      'Access-Control-Allow-Credentials': true
-    } }
-  ) => {
-  // internal closure
-  const acceptsEncClosure = async (s:string, i:T):Promise<NoStatusSRet> => {
-    switch (s) {
-      case '*':
-        // no-preference - we chose brotli
-        return {...defaultReturnValue, ...await brotliP(fmtBody(i))}
-      case 'br':
-        return {...defaultReturnValue, ...await brotliP(fmtBody(i))}
-      case 'gzip':
-        return {...defaultReturnValue, ...await gzipP(fmtBody(i))}
-      case 'deflate':
-        return {...defaultReturnValue, ...await deflateP(fmtBody(i))}
-      case 'identity':
-        return {...defaultReturnValue, ...await fmtBody(i)}
-      default:
-        // found an odd Encoding ID string
-        // likley a compoud/weighted encoding string
-        break
-    }
-
-    if (s.includes(',')) {
-      // one entry has a weighted option syntax
-      return Promise.race(
-        s.split(',')
-          .map(enc => acceptsEncClosure(
-            enc.split(';')[0], // looking for key/head not the tail/value
-            i
-          ))
-      )
-    } else {
-      return {...defaultReturnValue, ...await fmtBody(i)}
-    }
-  }
-
-  return async (e:Evt, body:T) => {
-    // look for headers including 'accept-encoding'
-    // except nevermind with upper/lower casing
-    const acceptedArr = Object.entries(e.headers)
-      .map(([k, v]) => [k.toLowerCase(), v])
-      .filter(([k, _]) => k === 'accept-encoding')
-      .map(([_, v]) => v)
-      .filter(v => v) as string[]
-
-    return JSON.stringify(body).length > characterThreshold && acceptedArr.length >= 1
-      // choose the first 
-      // since its only possible to have multiple if the request mixes upper/lower casing of accept-encoding
-      ? acceptsEncClosure(acceptedArr[0], body)
-      : fmtBody(body)
-  }
+export const CORSHeaderEntries = {
+  'Access-Control-Allow-Origin':'*',
+  'Access-Control-Allow-Credentials': true
 }
+
+export const respSelector = <T extends string | object>(fmtBodyFn:(i:T)=>Promise<NoStatusSRet>, characterThreshold = 800) => 
+  ( defaultReturnValue:Partial<NoStatusSRet> = { headers: CORSHeaderEntries } ) => {
+    // internal closure
+    const acceptsEncClosure = async (s:string, i:T):Promise<NoStatusSRet> => {
+      switch (s) {
+        case '*':
+          // no-preference - we chose brotli
+          return {...defaultReturnValue, ...await brotliP(fmtBodyFn(i))}
+        case 'br':
+          return {...defaultReturnValue, ...await brotliP(fmtBodyFn(i))}
+        case 'gzip':
+          return {...defaultReturnValue, ...await gzipP(fmtBodyFn(i))}
+        case 'deflate':
+          return {...defaultReturnValue, ...await deflateP(fmtBodyFn(i))}
+        case 'identity':
+          return {...defaultReturnValue, ...await fmtBodyFn(i)}
+        default:
+          // found an odd Encoding ID string
+          // likley a compoud/weighted encoding string
+          break
+      }
+
+      if (s.includes(',')) {
+        // one entry has a weighted option syntax
+        return Promise.race(
+          s.split(',')
+            .map(enc => acceptsEncClosure(
+              enc.split(';')[0], // looking for key/head not the tail/value
+              i
+            ))
+        )
+      } else {
+        return {...defaultReturnValue, ...await fmtBodyFn(i)}
+      }
+    }
+
+    return async (e:Evt, body:T) => {
+      // look for headers including 'accept-encoding'
+      // except nevermind with upper/lower casing
+      const acceptedArr = Object.entries(e.headers)
+        .map(([k, v]) => [k.toLowerCase(), v])
+        .filter(([k, _]) => k === 'accept-encoding')
+        .map(([_, v]) => v)
+        .filter(v => v) as string[]
+      
+      // console.log(body)
+
+      const repRet =  await (acceptedArr.length >= 1 && JSON.stringify(body).length > characterThreshold
+        // choose the first 
+        // since its only possible to have multiple if the request mixes upper/lower casing of accept-encoding
+        ? acceptsEncClosure(acceptedArr[0], body)
+        : fmtBodyFn(body))
+      
+      // console.log({repRet})
+      return repRet
+    }
+  }
 
 // #region application payload formatter
 
-export const jsonLDResp = async (i:{doc:JsonLdDocument, ctx:ContextDefinition}): Promise<NoStatusSRet> => {
-  const body = JSON.stringify(await flatten(await compact(i.doc, i.ctx)))
-  return {
-  headers: { 
-    'Content-Length': body.length,
-    'Content-Type': 'applciation/ld+json',
-  },
-  body,
-  isBase64Encoded: false,
-  cookies: []
-}}
+// export const jsonLDResp = async (i:{doc:JsonLdDocument, ctx:ContextDefinition}): Promise<NoStatusSRet> => {
+//   const body = JSON.stringify(await flatten(await compact(i.doc, i.ctx)))
+//   return {
+//   headers: { 
+//     'Content-Length': body.length,
+//     'Content-Type': 'applciation/ld+json',
+//   },
+//   body,
+//   isBase64Encoded: false,
+//   cookies: []
+// }}
 
 export const jsonResp = async (bodyInput:object): Promise<NoStatusSRet> => {
   const body = JSON.stringify(bodyInput)
-  return {
-  headers: { 
-    'Content-Length': body.length,
-    'Content-Type': 'applciation/json' ,
-  },
-  body,
-  isBase64Encoded: false,
-  cookies: []
+  const retJson = {
+    isBase64Encoded: false,
+    headers: { 
+      'Content-Length': body.length,
+      'Content-Type': 'application/json' ,
+    },
+    cookies: [],
+    body,
   }
+
+  // console.log({ retJson })
+  return retJson
 }
 
-export const htmlResp = async (html:string): Promise<NoStatusSRet> => {
-  return {
-  headers: { 
-    'Content-Length': html.length,
-    'Content-Type': 'text/html'
-  },
-  body: html,
-  isBase64Encoded: false,
-  cookies: []
-}}
 
 export const textResp = async (text:string): Promise<NoStatusSRet> => {
   return {
@@ -191,8 +197,11 @@ export const jsonGzResp = async (body:any) => gzipP(jsonResp(body))
 export const jsonBrResp = async (body:any) => brotliP(jsonResp(body))
 export const jsonDeflate = async (body:any) => deflateP(jsonResp(body))
 
-export const jsonLDBrResp = async (i:{doc:JsonLdDocument, ctx:ContextDefinition}) => brotliP(jsonLDResp(i))
-export const jsonLDGzipResp = async (i:{doc:JsonLdDocument, ctx:ContextDefinition}) => gzipP(jsonLDResp(i))
+// removed because the dependencies were causing the build process fits
+// and at present they are not being used
+// 
+// export const jsonLDBrResp = async (i:{doc:JsonLdDocument, ctx:ContextDefinition}) => brotliP(jsonLDResp(i))
+// export const jsonLDGzipResp = async (i:{doc:JsonLdDocument, ctx:ContextDefinition}) => gzipP(jsonLDResp(i))
 
 // #endregion application payload formatter
 

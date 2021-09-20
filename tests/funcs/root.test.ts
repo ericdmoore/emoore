@@ -8,7 +8,7 @@ test('basic root test', async () => {
   expect(r).toEqual({
     statusCode: 300,
     headers: {
-      Location: 'http://im.ericdmoore.com',
+      Location: 'https://im.ericdmoore.com',
       "X-Developer": "https://github.com/ericdmoore/emoore/wiki",
     }
   })

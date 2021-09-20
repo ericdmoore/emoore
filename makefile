@@ -2,36 +2,47 @@ INSPECTOR = npx graphql-inspector introspect
 LINTER = npx graphql-schema-linter
 TESTS = npx jest tests/*.test.ts tests/**/*.test.ts --coverage
 
+tests: test
+
 test:
 	npx jest tests/ --coverage
 
-tests: test
+line-count:
+	npx ts-node -P ./node.tsconfig.json tools/linecount.ts -- server/**/*.ts
+
+
+
 
 rm-build:
 	rm -rf build/
 
-build-cloud: 
-	cd cloud; pwd; npm ci; npm run build; npx cdk synth
-
-line-count:
-	npx ts-node tools/linecount.ts -- server/**/*.ts
-
 build-code:
 	pwd; npx tsc
+
+build-cloud: 
+	cd cloud; pwd; npm ci; npm run build; npx cdk synth;
 
 build: build-code build-cloud
 	@echo Built Application Code And Cloud Comps
 
-cloud-install: 
+
+
+cloud-install:
 	cd cloud; npm i
 
-deploy:
+deploy: preflight build test rm-build postflight
 	cd cloud; pwd; npm run cdk deploy
 
-preflight: build show-extras rm-build test
 
-postflight: 
-	npx jest tests-post-deploy
+
+
+preflight: build show-extras rm-build test line-count
+
+postflight: post-deploy-tests
+	@echo "Post Deployment Tests Concluded"
+
+
+
 
 schema-gen: 
 	npx ts-node server/models/mergeSchemas.ts
@@ -44,6 +55,10 @@ schema-inspect: schema-gen
 
 schema-check: schema-lint schema-inspect
 	@echo Schema Linted and Introspected
+
+
+
+
 
 show-extras: code-show-todos tests-show-todo tests-show-skip
 
@@ -65,8 +80,10 @@ tests-show-more: tests-show-todo tests-show-skip
 	@echo ""
 	@echo "> #Showing All Unfinished Tests"
 
-test-post-deploy:
-	npx esbuild --bundle client/post-deploy-test.ts | node
+post-deploy-tests:
+	npx esbuild client/post-deploy-test.ts --platform=node --target=node14 --bundle | node
+
+
 
 list:
 	@echo 

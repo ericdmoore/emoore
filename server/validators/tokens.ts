@@ -1,4 +1,4 @@
-import type { JWTObjectOutput, Evt } from '../types'
+import type { Evt } from '../types'
 import type { ValidationTest } from '../funcs/validations'
 import type { ILoginInfoInput } from '../funcs/tokens'
 import type { IUser } from '../entities'
@@ -8,11 +8,10 @@ import { user } from '../entities'
 import { createHmac } from 'crypto'
 import { btoa } from '../utils/base64'
 import { pluckDataFor } from '../utils/pluckData'
-import { jwtVerify } from '../auths/validJWT'
+import { accessToken } from '../auths/validJWT'
 import { hasElements } from '../utils/objectKeyCheck'
 
 // #region interfaces
-
 
 // type ReqdAuthZ = FullObject<authZ>
 // type PartAuthZ = {
@@ -35,13 +34,13 @@ export const pluckAuthTokenFromEvent = (e:Evt) => first(
   ].map(f => f(e, undefined))
 )
 
-
+export const pluckStarterTokenFromEvent = (e:Evt) => pluckDataFor('starterToken')(e, null)
 
 /**
 *
 * @param e
 */
-export const pluckCredentialsFromEvent = (e:Evt): ILoginInfoInput => {
+export const pluckCredentialsFromEvent = (e:Evt) => {
   const p = pluckDataFor('p')(e, null)
   return {
     email: pluckDataFor('email')(e, null),
@@ -100,38 +99,57 @@ export const passShouldBeProvidedAndValid: ValidationTest<unknown> = async (e) =
   }
 }
 
-export const emailAddressShouldBeValid: ValidationTest<unknown> = async (e, c, d) => {
+export const emailAddressShouldBeValid = (sidecarKey:string): ValidationTest<unknown> => async (e, c, d) => {
   const creds = pluckCredentialsFromEvent(e)
 
-  const u = creds.email
+  const usr = creds.email
     ? await user.lookupVia({ typeID: 'email', exID: creds.email })
     : await Promise.resolve(undefined)
+
+  const expensiveData = { [sidecarKey]: usr }
 
   return {
     code: 400,
     reason: 'Email Address Is Not Found',
-    passed: !!u,
+    passed: !!usr,
+    ...(usr ? { expensiveData } : {}),
     InvalidDataLoc: '',
     InvalidDataVal: '',
     docRef: ''
   }
 }
 
-
 export const emailCredentialShouldMatchTheEmailInTheAuthToken: ValidationTest<unknown> = async (e, c, d) => {
   const creds = pluckCredentialsFromEvent(e)
   const authTok = pluckAuthTokenFromEvent(e)
-  const jwtUser = authTok ? await jwtVerify<JWTObjectOutput>()(authTok) : undefined
 
-  return {
-    code: 400,
-    reason: 'Email Addresses Must Match',
-    passed: jwtUser?.email 
-      ? jwtUser.email === creds.email 
-      : true,
-    InvalidDataLoc: '[H>Q>C].authToken#email === [H>Q>C].email',
-    InvalidDataVal: `${{email: creds?.email, authTokenEmail: jwtUser?.email}}`,
-    docRef: ''
+  if (authTok) {
+    const jwtUser = await accessToken().fromString(authTok ?? '')
+      .then(d => d.obj)
+      .catch(er => {
+        console.error({ authTok }, er)
+        return { email: '_<>_MISSING_<>_' }
+      })
+
+    console.log({ jwtUser })
+
+    return {
+      code: 400,
+      reason: 'Email Addresses Must Match',
+      passed: jwtUser.email === creds.email,
+      InvalidDataLoc: '[H>Q>C].authToken#email === [H>Q>C].email',
+      InvalidDataVal: `${{ email: creds?.email, authTokenEmail: jwtUser?.email }}`,
+      docRef: ''
+    }
+  } else {
+    return {
+      code: 400,
+      reason: 'AuthToken must be present and verifiable to match the provided email addresses',
+      passed: false,
+      InvalidDataLoc: '[H>Q>C].authToken#email === [H>Q>C].email',
+      InvalidDataVal: `${{ email: creds?.email, authTokenEmail: '% not provided %' }}`,
+      docRef: ''
+    }
   }
 }
 
@@ -148,20 +166,22 @@ export const authTokenShouldBeProvided: ValidationTest<unknown> = async (e) => {
 }
 
 export const authTokenShouldBeValid: ValidationTest<unknown> = async (e) => {
-  const token = pluckAuthTokenFromEvent(e)
-  const tokenObj = await jwtVerify()(token).catch(er => null)
+  const authTokStr = pluckAuthTokenFromEvent(e)
+  const tokenObj = (await accessToken().fromString(authTokStr ?? '')).obj
   const doesVerify = !!tokenObj
-  const hasAllElems = hasElements('uacct', 'email', 'maxl25')(tokenObj)
+  // since from string does not do data validation - just a type cast
+  // do not remove this validation, until  we move to a io-ts validation
+  const hasAllElems = hasElements('uacct', 'email', 'last25')(tokenObj)
 
   // console.log({ tokenObj, doesVerify, hasAllElems })
 
-  if (token) {
+  if (authTokStr) {
     return {
       code: 400,
       reason: 'Invalid Authorization Token',
       passed: doesVerify && hasAllElems,
       InvalidDataLoc: '[H>Q>C].authToken',
-      InvalidDataVal: token,
+      InvalidDataVal: authTokStr,
       docRef: ''
     }
   } else {
@@ -173,24 +193,36 @@ export const authTokenShouldBeValid: ValidationTest<unknown> = async (e) => {
 
 export const authTokenShouldContainValidUacct = (sidecarKey:string): ValidationTest<unknown> => async (e) => {
   const token = pluckAuthTokenFromEvent(e)
-  const tokenData = await jwtVerify<JWTObjectOutput>()(token).catch(er => null)
-  const usr = tokenData?.uacct
-    ? await user.getByID(tokenData.uacct).catch(er => undefined)
-    : await Promise.resolve(undefined)
+  if (token) {
+    const tokenData = (await accessToken().fromString(token)).obj
+    const usr = tokenData?.uacct
+      ? await user.getByID(tokenData.uacct).catch(er => undefined)
+      : await Promise.resolve(undefined)
 
-  const expensiveData = {[sidecarKey] :usr} as {[str:string] : unknown }
-  const passed = !!usr 
+    const expensiveData = { [sidecarKey]: usr } as {[str:string] : unknown }
+    const passed = !!usr
 
-  return {
-    code: 400,
-    reason: 'No User Exists by the given Uacct',
-    passed,
-    InvalidDataLoc: '[H>Q>C].authToken',
-    InvalidDataVal: token,
-    docRef: '#',
-    ...(passed ? { expensiveData } : {})
+    return {
+      code: 400,
+      reason: 'No User Exists by the given Uacct',
+      passed,
+      InvalidDataLoc: '[H>Q>C].authToken',
+      InvalidDataVal: token,
+      docRef: '#',
+      // add expensive Data if passed
+      ...(passed ? { expensiveData } : {})
+    }
+  } else {
+    return {
+      code: 400,
+      reason: 'No AuthToken Provided',
+      passed: false,
+      InvalidDataLoc: '[H>Q>C].authToken',
+      InvalidDataVal: 'null',
+      docRef: '#'
+    }
   }
-} 
+}
 
 export const challengeTOTPShouldBeValid: ValidationTest<AuthZFlatPartial> = async (e, c, d) => {
   if (d?.email) {

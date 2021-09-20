@@ -1,8 +1,9 @@
 // import ky from 'ky'
 // import ky from 'ky-universal';
+import type { IUserPublic } from '../server/funcs/tokens'
+import type { Response } from 'got'
+
 import ky from 'got'
-import {Response} from 'got'
-import { refreshToken } from '../server/auths/validJWT'
 import {atob} from '../server/utils/base64'
 
 interface TokenInputUSerCreds{
@@ -37,33 +38,38 @@ export const client = (baseURL:string)=>{
         tokens: 'tokens',
         links: 'links',
         users: 'users',
-        expand: 'expamnd',
+        expand: 'expand',
         stats: 'stats',
     }
 
     const postTokens =  (tokenResouce:string)=>async (input: TokenInput)=>{
         let r: Response
         if('email' in input){
-            r = await ky.post(`${baseURL}/${tokenResouce}`,{headers:{
-                email: encodeURIComponent(input.email),
-                p: atob(input.passphrase),
-                TFAchallengeResp: encodeURIComponent(input.TFA),
-                TFAtype: encodeURIComponent(input.TFAtype ?? 'TOTP' ),
-            }})
+            r = await ky.post(`${baseURL}/${tokenResouce}`,{
+                    responseType:'json', 
+                    headers:{
+                        email: encodeURIComponent(input.email),
+                        p: atob(input.passphrase),
+                        TFAchallengeResp: encodeURIComponent(input.TFA),
+                        TFAtype: encodeURIComponent(input.TFAtype ?? 'TOTP' ),
+                    }
+                })
         }else{
-            r = await ky.post(`${baseURL}/${tokenResouce}`,{headers:{
-                authToken: input.starterToken
-            }})
+            r = await ky.post(`${baseURL}/${tokenResouce}`,{
+                    responseType:'json',
+                    headers:{
+                        authToken: input.starterToken
+                    }
+                })
         }
         authToken = refreshAuthToken(authToken, r)
-        return r
+        return r as unknown as {authToken:string, user:IUserPublic}
     }
-
- 
 
     const tokens = {
         get: async (input:TokenInputUSerCreds    | {token:string}) => {
-            const r = await ky.get(baseURL + resNames.tokens, { 
+            const r = await ky.get(`${baseURL}/${resNames.tokens}`, { 
+                responseType:'json',
                 headers:{ 
                     ...('token' in input 
                         ? {authToken: input.token} 
@@ -76,7 +82,11 @@ export const client = (baseURL:string)=>{
                     } 
                 })
             authToken = refreshAuthToken(authToken, r)
-            return r
+            return r as unknown as {refreshedAuthToken: string,
+                user: IUserPublic
+                delegateStarterTokens: string[], // I am a helper for these accounts, and they can revoke my access
+                revocableDelegationStarterTokens: [string]}
+                 // I have these helpers for my account}
         },
         put: postTokens('tokens'),
         post: postTokens('tokens'),
@@ -85,7 +95,9 @@ export const client = (baseURL:string)=>{
 
     const expand = {
         get: async (short:string)=>{
-            const r = await ky.get(`${baseURL}/${resNames.expand}/${short}`,{headers:{authToken}})
+            const url = `${baseURL}/${resNames.expand}/${short}`
+            console.log({ method:'GET', url })
+            const r = await ky.get(url,{ responseType:'json', headers:{authToken} })
             authToken = refreshAuthToken(authToken, r)
             return r
         },
@@ -96,7 +108,7 @@ export const client = (baseURL:string)=>{
 
     const stats = {
         get: async ()=>{
-            const r = await ky.get(`${baseURL}/${resNames.stats}`,{headers:{authToken}})
+            const r = await ky.get(`${baseURL}/${resNames.stats}`,{responseType:'json', headers:{authToken}})
             authToken = refreshAuthToken(authToken, r)
             return r
         },
@@ -107,22 +119,22 @@ export const client = (baseURL:string)=>{
 
     const links = {
         get: async () => {
-            const r = await ky.get(`${baseURL}/${resNames.links}`,{headers:{authToken}})
+            const r = await ky.get(`${baseURL}/${resNames.links}`,{ responseType:'json', headers:{authToken}})
             authToken = refreshAuthToken(authToken, r)
             return r
         },
         put: async () => {
-            const r = await ky.put(`${baseURL}/${resNames.links}`,{headers:{authToken}} )
+            const r = await ky.put(`${baseURL}/${resNames.links}`,{ responseType:'json', headers:{authToken}} )
             authToken = refreshAuthToken(authToken, r)
             return r
         },
         post:async() => {
-             const r = await ky.post(`${baseURL}/${resNames.links}`,{headers:{authToken}})
+             const r = await ky.post(`${baseURL}/${resNames.links}`,{ responseType:'json', headers:{authToken}})
              authToken = refreshAuthToken(authToken, r)
              return r
         },
         del: async () => {
-            const r = await ky.delete(`${baseURL}/${resNames.links}`,{headers:{authToken}})
+            const r = await ky.delete(`${baseURL}/${resNames.links}`,{ responseType:'json', headers:{authToken}})
             authToken = refreshAuthToken(authToken, r)
             return r
         },
@@ -130,27 +142,27 @@ export const client = (baseURL:string)=>{
 
     const users = {
         get:  async ()=>{
-            const r = await ky.get(`${baseURL}/${resNames.users}`, { headers: {authToken}} )
+            const r = await ky.get(`${baseURL}/${resNames.users}`, { responseType:'json',  headers: {authToken}} )
             authToken = refreshAuthToken(authToken, r)
             return r
         },
         put:  async ()=>{
-            const r = await ky.put(`${baseURL}/${resNames.users}`, { headers: {authToken}} )
+            const r = await ky.put(`${baseURL}/${resNames.users}`, { responseType:'json',  headers: {authToken}} )
             authToken = refreshAuthToken(authToken, r)
             return r
         },
         post: async ()=>{
-            const r = await ky.post(`${baseURL}/${resNames.users}`, { headers: {authToken}, json:{} } )
+            const r = await ky.post(`${baseURL}/${resNames.users}`, { responseType:'json',  headers: {authToken}, json:{} } )
             authToken = refreshAuthToken(authToken, r)
             return r
         },
         del:  async ()=>{
-            const r = await ky.delete(`${baseURL}/${resNames.users}`, { headers: {authToken}} )
+            const r = await ky.delete(`${baseURL}/${resNames.users}`, { responseType:'json',  headers: {authToken}} )
             authToken = refreshAuthToken(authToken, r)
             return r
         },
     }
-    const root = ()=>ky.get(baseURL)
+    const root = ()=>ky.get(baseURL, {followRedirect: false})
 
     return {
         get: {
@@ -173,11 +185,12 @@ export const client = (baseURL:string)=>{
             tokens: tokens.del,
             links: links.del
         },
+        root,
         tokens,
         stats, 
         links,
         users,
-        root,
+        expand,
         authToken
     }
 }

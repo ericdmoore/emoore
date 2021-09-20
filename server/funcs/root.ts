@@ -16,8 +16,8 @@ export const handler: IFunc = async () => {
   // console.log(desc)
   return { statusCode: 300, 
     headers: {  
+      Location:       'https://im.ericdmoore.com',
       'X-Developer': 'https://github.com/ericdmoore/emoore/wiki',
-      Location: 'http://im.ericdmoore.com',
     } 
   } as SRet
 }

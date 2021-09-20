@@ -7,6 +7,8 @@ const TableName = TABLE_NAME
 const main = async () => {
   // start local Dynamo Svc
   // and set the internals of the Entity framework to use the locally configured reader/writer
+  
+  // jest.setTimeout(10000); // in milliseconds
 
   const port = 4567
   const dynamoLocal = await localDynamo.launch(undefined, port)

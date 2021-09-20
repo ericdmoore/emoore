@@ -1,6 +1,5 @@
 {
   "exclude": ["node_modules","dist","build", "cloud"],
-
   "compilerOptions": {
     /* Visit https://aka.ms/tsconfig.json to read more about this file */
 

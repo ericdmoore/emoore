@@ -2,7 +2,7 @@
 import { user } from '../../server/entities'
 import { appTable } from '../../server/entities/entities'
 import { authenticator } from 'otplib'
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs'
 
 // #region interfaces
 

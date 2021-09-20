@@ -9,7 +9,8 @@ import handler,{getLinkHistory} from '../../server/funcs/expand'
 import {link, click, user, appTable, userAccess} from '../../server/entities'
 import {event, ctx, RequestContext} from '../gatewayData'
 // import type {BatchCreateElem}from '../../src/entities'
-import {sleep} from '../../server/utils/time'
+// import {sleep} from '../../server/utils/time'
+import {JSONparse} from '../../server/utils/jsonParse'
 
 
 const { geos, rotates, expires, hurdles, keepalive } = link.dynamicConfig
@@ -424,6 +425,16 @@ describe('Expand Link Data Setup',()=>{
         // DB consistency issues createa race condition going fast for tests
         dealingWithRaceCondition(resp2)
         dealingWithRaceCondition(resp3)
+    })
+
+    test('Errors show up as appilcation/json', async ()=>{
+        const e = event('GET', '/expand/',  { http: { sourceIp:'1.1.1.1' } }, { short:'Link_No_Exist_causes_Error_resp' } )
+        const resp = await handler(e,ctx) // 9th click
+        const {err, data} = JSONparse(resp.body ?? 'null')
+
+        expect(data).toHaveProperty('errors')
+        expect(Object.keys(resp?.headers ?? {}).map(s=>s.toLowerCase())).toContain('content-type')
+        expect(resp?.headers?.['content-type']).toEqual('application/json')
     })
     
 })

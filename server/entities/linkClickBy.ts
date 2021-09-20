@@ -141,7 +141,7 @@ const daysToWeeks = (p:number[],c:ILinksByDuration,i:number)=>{
 
 const bumpAllKeys = (nums: number[])=>Object.fromEntries(nums.map((count, i)=>([i+1,count])))
 
-export const getLinkHistory =  async (short:string):Promise<ExpandLinkHistory>=>{
+export const getLinkHistory =  async (short:string) :Promise<ExpandLinkHistory> => {
   const [all, hours24, days28, months3, ] = await Promise.all([
     linkClickCountsAllTime.getBatch({short, bucketIDs: [linkClickCountsAllTime.bucketID('_all')] }),
     linkClickCountsByHr.getBatch({short,    bucketIDs: stepByHour(24).map(n=>linkClickCountsByHr.bucketID(n)) }),

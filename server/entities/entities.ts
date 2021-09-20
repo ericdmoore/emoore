@@ -74,7 +74,7 @@ export const epoch = () => Date.now() //  epoch time in ms
 export const config = process.env.AWS_KEY
   ? {
       region: 'us-west-2',
-      endpoint: undefined,
+      // endpoint: undefined,
       credentials: new Credentials({
         accessKeyId: process.env.AWS_KEY as string,
         secretAccessKey: process.env.AWS_SECRET as string
@@ -89,12 +89,17 @@ export const config = process.env.AWS_KEY
       }
     }
 
+// console.dir({config})
+
 export const appTable = new Table({
-  name: 'emooreAppTable',
+  name: process.env.TABLE_NAME ?? 'emooreAppTable',
   partitionKey: 'pk',
   sortKey: 'sk',
   DocumentClient: new DynamoDB.DocumentClient(config)
 })
+
+// console.dir({appTable})
+// console.dir({docC: appTable.DocumentClient})
 
 export const customTimeStamps = (i: EntityAttributes): EntityAttributes => ({
   ...i,

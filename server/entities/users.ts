@@ -1,10 +1,10 @@
 // import type * as k from '../types'
 import { randomBytes } from 'crypto'
 import { Entity } from 'dynamodb-toolbox'
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs'
 import { nanoid } from 'nanoid'
 import { authenticator } from 'otplib'
-import * as base32 from 'hi-base32'
+import { encode as encodeB32 } from 'hi-base32'
 import { appTable, customTimeStamps } from './entities'
 import { userLookup } from './userLookup'
 
@@ -21,6 +21,13 @@ interface TwoFAStringSec {
    userLabel?: string
 }
 
+export interface UseBase{
+  email: string
+  uacct: string
+  displayName:string
+  plaintextPassword: string
+}
+
 // @ref overview:  https://developers.yubico.com/U2F/Protocol_details/Overview.html
 // @ref python implementation: https://github.com/Yubico/python-fido2/blob/master/examples/server/server.py
 
@@ -31,22 +38,22 @@ interface TwoFAfido20 {
   keyHandle: string // keyID aka key-handle in the USB
   pubKey: string | null
   cert: string | null
-  counter?: number //  	RP verifies that the counter is hifgher than last time
+  counter?: number // RP verifies that the counter is hifgher than last time
 }
 type ITwoFactorOpt = TwoFAStringSec | TwoFAfido20
 
 export interface IUser{
   uacct: string
-  email: string
+  email: string // merely for display convenience - not for look up - for that, use the "userLookup" entity
   pwHash: string
   displayName: string
   oobTokens: ITwoFactorOpt[]
   backupCodes: string[]
-  maxl25: string[]
+  last25: string[]
   // delegation?:{ // should we rmeove this all together - how useful is this for links?
   //   operateFor: string[] // i can do things for these people -- {uacct: string, roles:string[], starterToken:string}
   //   revocableStartersTo: string[] // // these people can help me -- {uacct: string, roles:string[], starterToken:string}
-  // } 
+  // }
   cts: number
   mts: number
   entity: 'user'
@@ -70,11 +77,11 @@ export const user = {
    * @readsDB to verify no collision
    */
   mintUserID: async (attemptUacct?:string): Promise<string> => {
-    const tryUacct = attemptUacct ?? base32.encode(nanoid(15))
+    const tryUacct = attemptUacct ?? encodeB32(nanoid(15))
     const u = await user.getByID(tryUacct)
     if (u) {
       // retry, because collision found so re-attempt
-      return user.mintUserID(`${attemptUacct}_${base32.encode(nanoid(15)).slice(0, 5)}`)
+      return user.mintUserID(`${attemptUacct}_${encodeB32(nanoid(15)).slice(0, 5)}`)
     } else {
       return tryUacct
     }
@@ -104,6 +111,22 @@ export const user = {
     const opts = { uacct, exID, typeID, isIDVerified: false }
     await userLookup.ent.put(opts)
     return opts
+  },
+  externalIDs: {
+    add: async (uacct:string, typeID:'email'| 'phone', exID:string) => {
+      const opts = { uacct, exID, typeID, isIDVerified: false }
+      await userLookup.ent.put(opts)
+      return opts
+    },
+    verify: async (uacct:string, typeID:'email'| 'phone', exID:string) => {
+      const opts = { uacct, exID, typeID, isIDVerified: true }
+      await userLookup.ent.update(opts)
+      return opts
+    },
+    rm: async (uacct:string, typeID:'email'| 'phone', exID:string) => {
+      await userLookup.ent.delete({ uacct, exID, typeID })
+      return null
+    }
   },
   /**
    * @param uacct user account
@@ -139,37 +162,37 @@ export const user = {
     const oobTokens = [...oobTokenInputs, await user.otp.gen2FA(uacct, 'TOTP')]
     const backupCodes = [...backupCodeInputs, ...await user.otp.genBackups()]
     const pwHash = await user.password.toHash(plaintextPassword)
-    
-    // delegation, 
-    await user.ent.put({ uacct, email, displayName, oobTokens, backupCodes, pwHash })
-    await user.addExternalID(uacct, 'email',email)
-    
+    const last25 = [] as string[]
+
+    // delegation,
+    await user.ent.put({ uacct, email, displayName, oobTokens, backupCodes, pwHash, last25 })
+    await user.addExternalID(uacct, 'email', email)
+
     return {
       uacct,
       email,
       displayName,
       oobTokens,
       backupCodes,
-      pwHash,
+      pwHash
       // delegation
     }
   },
-  batch:{
-    put : async (...userList:UseBase[])=> Promise.all(
-          userList.map(
-            u=>user.genUser(
-              u.email,
-              u.plaintextPassword,
-              u.uacct,
-              u.displayName)
-          )
-        )
-    ,
-    rm: async (...userList:UseBase[])=>Promise.all([
+  batch: {
+    put: async (...userList:UseBase[]) => Promise.all(
+      userList.map(
+        u => user.genUser(
+          u.email,
+          u.plaintextPassword,
+          u.uacct,
+          u.displayName)
+      )
+    ),
+    rm: async (...userList:UseBase[]) => Promise.all([
       appTable.batchWrite(userList.map(u => user.ent.deleteBatch(u))),
-      appTable.batchWrite(userList.map(u => userLookup.ent.deleteBatch({exID: u.email, typeID:'email'}))),
+      appTable.batchWrite(userList.map(u => userLookup.ent.deleteBatch({ exID: u.email, typeID: 'email' })))
     ]),
-    get: async (...userList:UseBase[])=>appTable.batchGet(userList.map(u=> user.ent.getBatch(u)))
+    get: async (...userList:UseBase[]) => appTable.batchGet(userList.map(u => user.ent.getBatch(u)))
   },
   password: {
     /**
@@ -275,7 +298,7 @@ export const user = {
         const uri = authenticator.keyuri(uacct, 'emoo.re', secret)
         return { strategy, uri, secret, userLabel }
       } else if (strategy === 'SMS') {
-        const secret = base32.encode(nanoid(5)).slice(0, 6)
+        const secret = encodeB32(nanoid(5)).slice(0, 6)
         const jwt = `somejwt.including.${uacct}`
         const uri = `https://login.emoo.re?authToken=${jwt}`
         return { strategy, uri, secret, userLabel }
@@ -312,24 +335,11 @@ export const user = {
       oobTokens: { type: 'list' }, // { strategy, uri, secret, label }[]
       backupCodes: { type: 'set', setType: 'string' },
       pwHash: { type: 'string' },
+      last25: { type: 'list' },
       pk: { hidden: true, partitionKey: true, dependsOn: 'uacct', default: (data:any) => user.pk(data) },
       sk: { hidden: true, sortKey: true, dependsOn: 'uacct', default: (data:any) => user.sk(data) }
     })
   })
-}
-
-interface UseBase{
-  email: string
-  uacct: string
-  displayName:string
-  plaintextPassword: string
-}
-
-interface UseBase{
-  email: string
-  uacct: string
-  displayName:string
-  plaintextPassword: string
 }
 
 export default user

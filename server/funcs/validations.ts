@@ -31,22 +31,23 @@ export const validate = <T>(responder: Responder<Required<NonNullObj<T>>>, preVa
   }
 
   return async (event, context) => {
-    const allFuncResp = ( await Promise.all(
-        tests.map(async (t) => t(event, context, preValidationData))
-      ).catch(er => {
-        console.error('validationTestFunc rejected:', er)
-        return [{
+    const allFuncResp = (await Promise.all(
+      tests.map(async (t) => t(event, context, preValidationData))
+    ).catch(er => {
+      console.error('validationTestFunc rejected:', er)
+      return [{
         code: 400,
         reason: 'Experienced an Application Error During Validation',
         passed: false,
         InvalidDataVal: er
-      }] as ValidationResp[]}))
+      }] as ValidationResp[]
+    }))
 
-    const expensiveData = (allFuncResp.filter(t => typeof t !== 'boolean' ) as ValidationResp[])
+    const expensiveData = (allFuncResp.filter(t => typeof t !== 'boolean') as ValidationResp[])
       .reduce(
-      (p, c) => ({ ...p, ...c.expensiveData }),
+        (p, c) => ({ ...p, ...c.expensiveData }),
       {} as {[key:string]:unknown}
-    )
+      )
 
     const errors = (allFuncResp.filter(t => typeof t === 'boolean' ? !t : !t.passed) as ValidationResp[])
       .map((t) => {
@@ -55,11 +56,12 @@ export const validate = <T>(responder: Responder<Required<NonNullObj<T>>>, preVa
       })
 
     // console.log({ errors, preValidationData })
-    
+
     if (hasNoErrors(preValidationData, errors)) {
       return responder(preValidationData, event, context, expensiveData)
     } else {
       return {
+        headers: { 'content-type': 'application/json' },
         statusCode: HttpStatusCode.BAD_REQUEST,
         isBase64Encoded: false,
         body: JSON.stringify({ errors })

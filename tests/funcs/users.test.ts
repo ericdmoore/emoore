@@ -1,26 +1,26 @@
-/* globals describe test expect beforeEach afterEach beforeAll afterAll */
-import type { Evt, SRet, JWTObjectInput, JWTelementsExtras, JWTelementsOptionInputs} from '../../server/types'
+/* globals describe test expect  beforeAll afterAll */
+// beforeEach afterEach
+import type { Evt, SRet } from '../../server/types'
 import handler from '../../server/funcs/users'
-import { user, appTable } from '../../server/entities'
+import { user } from '../../server/entities'
 import { event, ctx } from '../gatewayData'
 import { nanoid } from 'nanoid'
-import { userLookup } from '../../server/entities/userLookup'
-import { jwtSign, jwtVerify } from '../../server/auths/validJWT'
+import { accessToken, acceptanceToken } from '../../server/auths/tokens'
 import { brotliDecompress } from 'zlib'
 import { promisify } from 'util'
-import { btoa, atob } from '../../server/utils/base64'
-// import { sign } from 'jsonwebtoken'
+import { atob } from '../../server/utils/base64'
+import { JSONparse } from '../../server/utils/jsonParse'
 
 const openBrotliP = promisify(brotliDecompress)
 
-interface IUserInfo extends JWTelementsOptionInputs{
-  email:string
-  displayName:string
-  plaintextPassword: string 
-  uacct?: string
-}
+// interface IUserInfo extends JWTelementsOptionInputs{
+//   email:string
+//   displayName:string
+//   plaintextPassword: string
+//   uacct?: string
+// }
 
-type IUerInfoOutputs = IUserInfo &  JWTelementsExtras
+// type IUerInfoOutputs = IUserInfo & JWTelementsExtras
 
 export const userList = [
   {
@@ -43,27 +43,34 @@ export const userList = [
   }
 ]
 
-const signAcceptanceToken = jwtSign<IUserInfo>()
-const signAuthToken = jwtSign<JWTObjectInput>()
-const verifyToken = jwtVerify<IUerInfoOutputs>()
+// const signAcceptanceToken = jwtSign<IUserInfo>()
+// const signAuthToken = jwtSign<JWTObjectInput>()
+// const verifyToken = jwtVerify<IUerInfoOutputs>()
 
-beforeAll( async () => {
+beforeAll(async () => {
   await user.batch.put(...userList)
 })
 
-afterAll( async () => {
+afterAll(async () => {
   await user.batch.rm(...userList)
 })
 
 /*
 Overview
 =============
-* POST :: user -> starterToken -> (+2FA?)-> token
-* POST :: user + delegation User -> delegation starterToken
+* POST :: user -> (+2FA?) -> token
+* POST :: user + delegation User -> delegation starterToken // not supported anymore
 * GET :: token -> tokens
 * PUT :: token -> token
 * DELE :: token -> confimationMessage
 */
+
+const fmtUserInfo = (i:{email:string, displayName:string, plaintextPassword: string, uacct?:string}) => ({
+  email: encodeURIComponent(i.email),
+  displayName: encodeURIComponent(i.displayName),
+  plaintextPassword: atob(i.plaintextPassword),
+  uacct: i.uacct
+})
 
 describe('POST /users', () => {
   // beforeEach(async () => {})
@@ -72,20 +79,17 @@ describe('POST /users', () => {
   const postEvent = event('POST', '/users')
 
   test('New User :: userInfo + acceptanceToken', async () => {
-    
     const userInfo = {
       email: 'examplerA@example.com',
       displayName: 'Exampler Man',
       plaintextPassword: 'A Very Plain Ol Password'
     }
-    const acceptanceToken = await signAcceptanceToken(userInfo)
+    const accToken = (await acceptanceToken().create(userInfo)).token
     const e = {
-      ...postEvent, 
-      queryStringParameters :{
-        ...userInfo, 
-        acceptanceToken,
-        email: encodeURIComponent(userInfo.email),
-        plaintextPassword: atob(userInfo.plaintextPassword)
+      ...postEvent,
+      queryStringParameters: {
+        ...fmtUserInfo(userInfo),
+        acceptanceToken: accToken
       }
     }
 
@@ -93,10 +97,12 @@ describe('POST /users', () => {
     const resp = await handler(e, ctx) as SRet
     // console.log({ resp })
 
-    const body = (JSON.parse(resp.body ?? '{}')) as any
+    const { err, data } = JSONparse(resp?.body ?? 'null')
+    const body = data
+    expect(err).toBeFalsy()
+    expect(body).toHaveProperty('user')
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
-    expect(body).toHaveProperty('user')
   })
 
   test('New User with {accept-encoding:br} :: userInfo + acceptanceToken ', async () => {
@@ -115,39 +121,38 @@ describe('POST /users', () => {
       AwesomePassword that keeps going for days so that the compression algo will kick in,
       AwesomePassword that keeps going for days so that the compression algo will kick in,
       AwesomePassword that keeps going for days so that the compression algo will kick in`,
-      plaintextPassword: ` This element is not included in the response so it does not make sense to make it terribly long`
-      
+      plaintextPassword: ' This element is not included in the response so it does not make sense to make it terribly long'
     }
 
-    const acceptanceToken = await signAcceptanceToken(userInfo)    
     const e = {
       ...postEvent,
-      headers: {'Accept-Encoding':'br'},
+      headers: { 'Accept-Encoding': 'br' },
       queryStringParameters: {
-        ...userInfo,
-        acceptanceToken,
-        email: encodeURIComponent(userInfo.email),
-        plaintextPassword: atob(userInfo.plaintextPassword)
+        acceptanceToken: (await acceptanceToken().create(userInfo)).token,
+        ...fmtUserInfo(userInfo)
       }
     }
-    
+
     // console.log({ e })
     const resp = await handler(e, ctx) as SRet
     // console.log({ resp })
 
     const uncBody = await openBrotliP(
-      Buffer.from(resp.body as string,'base64')
-    ).catch(()=>Buffer.from('{}'))
+      Buffer.from(resp.body as string, 'base64')
+    ).catch(() => Buffer.from('{}'))
 
     const uncBodyStr = uncBody.toString('utf-8')
-    const body = JSON.parse(uncBodyStr)
+    const { err, data } = JSONparse(uncBodyStr)
+    const body = data
 
+    // console.log({ body })
+
+    expect(err).toBeFalsy()
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(true)
     expect(body).toHaveProperty('user')
 
     // expect(Buffer.isBuffer(resp.body)).toBe(true)
-
   })
 
   test('Error: Existing User :: userInfo + acceptanceToken', async () => {
@@ -158,20 +163,23 @@ describe('POST /users', () => {
       plaintextPassword: usr.plaintextPassword
     }
 
-    const acceptanceToken = await signAcceptanceToken(userInfo)
+    const accToken = (await acceptanceToken().create(userInfo)).token
+
     const e = {
-      ...postEvent, 
-      queryStringParameters :{
-        ...userInfo, 
-        acceptanceToken,
+      ...postEvent,
+      queryStringParameters: {
+        ...userInfo,
+        acceptanceToken: accToken,
         email: encodeURIComponent(userInfo.email),
         plaintextPassword: atob(userInfo.plaintextPassword)
       }
     }
 
     const resp = await handler(e, ctx) as SRet
-    const body = (JSON.parse(resp.body ?? '{}')) as any
-    
+    const { err, data } = JSONparse(resp?.body ?? 'null')
+    const body = data
+
+    expect(err).toBeFalsy()
     expect(resp.statusCode).toBe(400)
     expect(resp.isBase64Encoded).toBe(false)
     expect(body).toHaveProperty('errors')
@@ -185,34 +193,36 @@ describe('POST /users', () => {
       plaintextPassword: usr.plaintextPassword
     }
 
-    const acceptanceToken = await signAcceptanceToken(userInfo)    
+    const accToken = (await acceptanceToken().create(userInfo)).token
+
     const e = {
       ...postEvent,
-      headers: {'Accept-Encoding':'br'},
+      headers: { 'Accept-Encoding': 'br' },
       queryStringParameters: {
         ...userInfo,
-        acceptanceToken,
+        acceptanceToken: accToken,
         email: encodeURIComponent(userInfo.email),
         plaintextPassword: atob(userInfo.plaintextPassword)
       }
     }
-    
+
     // console.log({ e })
     const resp = await handler(e, ctx) as SRet
     // console.log({ resp })
-    const body = JSON.parse(resp.body??'{}')
+    const { err, data } = JSONparse(resp?.body ?? 'null')
+    const body = data
 
     // errors are not compressed for now
     // additionally, the response would not likely trigger the compression requirement
+    expect(err).toBeFalsy()
     expect(resp.statusCode).toBe(400)
     expect(resp.isBase64Encoded).toBe(false)
     expect(body).toHaveProperty('errors')
 
     // expect(Buffer.isBuffer(resp.body)).toBe(true)
-
   })
 
-  test('Errors: userInfo, acceptanceToken mismatch', async ()=>{
+  test('Errors: userInfo, acceptanceToken mismatch', async () => {
     const usr = userList[0]
     const userInfo = {
       email: usr.email,
@@ -220,21 +230,23 @@ describe('POST /users', () => {
       plaintextPassword: usr.plaintextPassword,
       auto: true
     }
-    const acceptanceToken = await signAcceptanceToken({ ...userInfo, uacct:'1234567890' })
+    // const acceptanceToken = await signAcceptanceToken()
+
+    const accToken = (await acceptanceToken().create({ ...userInfo, uacct: '1234567890' })).token
 
     const e = {
-      ...postEvent, 
+      ...postEvent,
       queryStringParameters: {
-        acceptanceToken,
+        acceptanceToken: accToken,
         displayName: usr.displayName,
         email: encodeURIComponent(userInfo.email),
-        plaintextPassword: atob(userInfo.plaintextPassword),
+        plaintextPassword: atob(userInfo.plaintextPassword)
       }
     } as Evt
 
     const resp = await handler(e, ctx) as SRet
     const body = JSON.parse(resp.body ?? '{}') as any
-    
+
     expect(resp.statusCode).toBe(400)
     expect(resp.isBase64Encoded).toBe(false)
     expect(body).toHaveProperty('errors')
@@ -242,8 +254,10 @@ describe('POST /users', () => {
 
   test('Send in Nothing ', async () => {
     const resp = await handler(postEvent, ctx) as SRet
-    const body = (JSON.parse(resp.body ?? '{}') as {starterToken?:string})
+    const { err, data } = JSONparse(resp?.body ?? 'null')
+    const body = data
 
+    expect(err).toBeFalsy()
     expect(resp.statusCode).toBe(400)
     expect(resp.isBase64Encoded).toBe(false)
     expect(body).toHaveProperty('errors')
@@ -252,37 +266,40 @@ describe('POST /users', () => {
 
 describe('GET /users', () => {
   const GETevent = event('GET', '/users')
-  
+
   test('Valid Request for Yoo Sir', async () => {
-    const e = {...GETevent}
+    const e = { ...GETevent }
     const { uacct, email } = userList[0]
-    
-    const authToken = await signAuthToken({ uacct, email, maxl25: [] })
+
+    const authToken = (await accessToken().create({ uacct, email, last25: [] })).token
     e.headers = { authToken }
 
-    const uTest = await user.getByID(uacct).catch(er => undefined)
+    // const uTest = await user.getByID(uacct).catch(er => undefined)
     // console.log({ e, uTest })
-    
+
     const resp = await handler(e, ctx) as SRet
-    const body = (JSON.parse(resp.body ?? 'null') as any)
+    const { err, data } = JSONparse(resp?.body ?? 'null')
+    const body = data
     // console.log({ resp })
-    
+    expect(err).toBeFalsy()
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
     expect(body).toHaveProperty('user')
   })
 
   test('Invalid Request for Yoo Sir', async () => {
-    const e = {...GETevent}
+    const e = { ...GETevent }
     const { uacct, email } = userList[0]
     // const usr = await user.getByID(uacct)
-    const authToken = await jwtSign('_Not The Righyt Key_')({ uacct, email, maxl25: [] })
+    const authToken = (await accessToken('_Not The Righyt Key_').create({ uacct, email, last25: [] })).token
     e.headers = { authToken }
 
     const resp = await handler(e, ctx) as SRet
     // console.log({ resp })
 
-    const body = (JSON.parse(resp.body ?? 'null') as any)
+    const { err, data } = JSONparse(resp?.body ?? 'null')
+    const body = data
+    expect(err).toBeFalsy()
     expect(resp.statusCode).toBe(400)
     expect(resp.isBase64Encoded).toBe(false)
     expect(body).toHaveProperty('errors')
@@ -293,14 +310,14 @@ describe('PUT /users', () => {
   // eslint-disable-next-line no-unused-vars
   const putEvent = event('PUT', '/users')
   test('Change Password', async () => {
-    const e = {...putEvent}
+    const e = { ...putEvent }
     const { uacct, email } = userList[0]
-    const authToken = await signAuthToken({ uacct, email, maxl25: [] })
-    const newPlaintextPassword  = 'an updatedPassword'
+    const authToken = (await accessToken().create({ uacct, email, last25: [] })).token
+    const newPlaintextPassword = 'an updatedPassword'
 
     e.headers = {
       authToken,
-      newPlaintextPassword : atob(newPlaintextPassword)
+      newPlaintextPassword: atob(newPlaintextPassword)
     }
 
     const resp = await handler(e, ctx) as SRet
@@ -308,32 +325,33 @@ describe('PUT /users', () => {
 
     const uVerify = await user.getByID(uacct)
     // console.log({ resp })
-    
+
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
     expect(body).toHaveProperty('user')
     expect(body.user.uacct).toEqual(uVerify.uacct)
     expect(
-      user.password.isValidForUser({uacct, passwordPlainText: newPlaintextPassword})
+      user.password.isValidForUser({ uacct, passwordPlainText: newPlaintextPassword })
     ).toBeTruthy()
   })
 
   test('Simul update of Email and DisplayName for Yoo', async () => {
-    const e = {...putEvent}
+    const e = { ...putEvent }
     const { uacct, email } = userList[0]
-    const authToken = await signAuthToken({ uacct, email, maxl25: [] })
     const newEmail = 'someOTherEmail@exmaple2.com'
-    const newDisplayName = `I'm the New DisplayName`
+    const newDisplayName = 'I\'m the New DisplayName'
 
     e.headers = {
-      authToken,
-      newEmail : encodeURIComponent(newEmail),
-      newDisplayName : encodeURIComponent(newDisplayName),
+      authToken: (await accessToken().create({ uacct, email, last25: [] })).token,
+      newEmail: encodeURIComponent(newEmail),
+      newDisplayName: encodeURIComponent(newDisplayName)
     }
 
     const resp = await handler(e, ctx) as SRet
-    const body = (JSON.parse(resp.body ?? 'null') as any)
-    
+    const { err, data } = JSONparse(resp?.body ?? 'null')
+    const body = data as any
+
+    expect(err).toBeFalsy()
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
     expect(body).toHaveProperty('user')
@@ -342,16 +360,18 @@ describe('PUT /users', () => {
   })
 
   test('Refresh Backup Codes for Yoo', async () => {
-    const e = {...putEvent}
+    const e = { ...putEvent }
     const { uacct, email } = userList[0]
-    const authToken = await signAuthToken({ uacct, email, maxl25: [] })
+    const authToken = (await accessToken().create({ uacct, email, last25: [] })).token
 
     const uBefore = await user.getByID(uacct)
-    e.headers = { authToken, refreshBackupCodes: 'true'}
+    e.headers = { authToken, refreshBackupCodes: 'true' }
     const resp = await handler(e, ctx) as SRet
-    const body = (JSON.parse(resp.body ?? 'null') as any)
+    const { err, data } = JSONparse(resp?.body ?? 'null')
+    const body = data as any
     const uAfter = await user.getByID(uacct)
-    
+
+    expect(err).toBeFalsy()
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
     expect(body).toHaveProperty('user')
@@ -359,17 +379,19 @@ describe('PUT /users', () => {
   })
 
   test('Add TOTP Option for Yoo', async () => {
-    const e = {...putEvent}
+    const e = { ...putEvent }
     const { uacct, email } = userList[0]
-    const authToken = await signAuthToken({ uacct, email, maxl25: [] })
 
-    e.headers = { authToken, addTOTP: 'Add_Me_KEEP_ME_label'}
+    const authToken = (await accessToken().create({ uacct, email, last25: [] })).token
+    e.headers = { authToken, addTOTP: 'Add_Me_KEEP_ME_label' }
 
     const uBefore = await user.getByID(uacct)
     const resp = await handler(e, ctx) as SRet
-    const body = (JSON.parse(resp.body ?? 'null') as any)
+    const { err, data } = JSONparse(resp?.body ?? 'null')
+    const body = data as any
     const uAfter = await user.getByID(uacct)
-    
+
+    expect(err).toBeFalsy()
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
     //
@@ -379,30 +401,30 @@ describe('PUT /users', () => {
     expect(body.TOTPdetails).toHaveProperty('label')
     expect(uBefore.oobTokens.length).toBeLessThanOrEqual(uAfter.oobTokens.length)
   })
-
 })
 
 describe('Removing user attributes /users', () => {
-
   test('Add then Remove a TOTP oobToken for Yoo', async () => {
-    const e = {...event('PUT', '/users')}
+    const e = { ...event('PUT', '/users') }
     const { uacct, email } = userList[0]
-    const authToken = await signAuthToken({ uacct, email, maxl25: [] })
+    const authToken = (await accessToken().create({ uacct, email, last25: [] })).token
 
     const uBefore = await user.getByID(uacct)
-    e.headers = { authToken, addTOTP: 'Push/Pop_label'}
+    e.headers = { authToken, addTOTP: 'Push/Pop_label' }
     await handler(e, ctx) as SRet
     const uMiddle = await user.getByID(uacct)
-    
-    e.headers = { authToken, rmTOTP: 'Push/Pop_label'}
+
+    e.headers = { authToken, rmTOTP: 'Push/Pop_label' }
     const respRm = await handler(e, ctx) as SRet
     const uAfter = await user.getByID(uacct)
 
-    const body = (JSON.parse(respRm.body ?? 'null') as any)
-    
+    const { err, data } = JSONparse(respRm.body ?? 'null')
+    const body = data as any
+
     expect(respRm.statusCode).toBe(200)
     expect(respRm.isBase64Encoded).toBe(false)
     //
+    expect(err).toBeFalsy()
     expect(body).toHaveProperty('user')
     expect(body).toHaveProperty('TOTPdetails')
     expect(body.TOTPdetails).toHaveProperty('wasRemoved', true)

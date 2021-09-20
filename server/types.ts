@@ -69,7 +69,7 @@ export interface JWTelementsExtras {
 }
 
 export type JWTelementsOptionInputs = Partial<JWTelementsExtras>
-    
+
 export interface toolboxGetOptions {
     consistent?: boolean;
     capacity?: DocumentClient.ReturnConsumedCapacity;

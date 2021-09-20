@@ -1,30 +1,44 @@
-import type { IFunc, SRet, Responder, JWTObjectInput, NonNullObj, JWTObjectOutput } from '../types'
+/**
+ * @todo clean up authToken with accessToken
+ * @ref AccessToken is always based on your uacct/password
+ * @ref AccessToken is always based on your uacct/password*
+ */
+
+import type { IFunc, SRet, Responder, NonNullObj } from '../types'
 import type { IUser } from '../entities/users'
+import type { IAccessTokenData } from '../auths/validJWT'
 // import type { ValidationResp } from './validations'
 
-import { user } from '../entities'
-import { jwtSign, jwtVerify } from '../auths/validJWT'
+import { accessToken } from '../auths/validJWT'
 import baseHandle from '../utils/methodsHandler'
 import validate from './validations'
 import {
   pluckCredentialsFromEvent,
+  // pluckStarterTokenFromEvent,
   pluckAuthTokenFromEvent,
   emailAddressShouldBeValid,
   emailShouldBeProvided,
-  emailCredentialShouldMatchTheEmailInTheAuthToken,
+  // emailCredentialShouldMatchTheEmailInTheAuthToken,
   passShouldBeProvidedAndValid,
   authTokenShouldBeValid,
   authTokenShouldBeProvided,
   challengeTOTPShouldBeValid
 } from '../validators/tokens'
 
+import { jsonResp, respSelector, CORSHeaderEntries } from '../utils/SRetFormat'
+const compressableJson = respSelector(jsonResp)
+
 // #region interfaces
 
 export interface ILoginInfoInput{
     email: string | null
     p: string | null
-    TFAtype?: 'TOTP' | 'U2F' | string
-    TFAchallengeResp?: string
+    TFAchallengeResp: string
+    TFAtype: 'TOTP' | 'U2F' | string
+}
+
+export interface DelegationInput extends Required<ILoginInfoInput>{
+  token:string
 }
 
 export interface IAuthzData{
@@ -36,26 +50,25 @@ export type IAuthzFlat = ILoginInfoInput & IUser & {email?: string}
 export type IAuthzFlatPartial = Partial<IAuthzFlat>
 export type IAuthzFlatRequired = Required<NonNullObj<IAuthzFlat>>
 
+export type IUserPublic = Omit<
+IUser,
+ | 'backupCodes'
+ | 'p'
+ | 'pwHash'
+ | 'oobTokens'
+ | 'TFAchallengeResp'
+ | 'TFAtype'
+ | 'cts'
+ | 'mts'
+ | 'entity'
+>
+
 // #endregion interfaces
 
 // pluickers
 
-const hasAllCreds = (login:ILoginInfoInput) => [
-  !!login?.email,
-  !!login?.p,
-  !!login?.TFAtype,
-  !!login?.TFAchallengeResp
-].every(truthyCondition => truthyCondition)
-
-/*
-
-AllCreds = complete token
-AllCreds + ?authToken = complete token
-email, p = starter token
-
-*/
-
-const sign = jwtSign()
+const hasAllCreds = (login : object): login is ILoginInfoInput => ['p', 'email', 'TFAtype', 'TFAchallengeResp'].every(key => key in login)
+// const deleteCredentials = (login : object): login is DelegationInput => hasAllCreds(login) && 'token' in login
 
 /**
  * Token
@@ -63,125 +76,105 @@ const sign = jwtSign()
  * @param c
  */
 export const validatedPOST:IFunc = async (e, c) => {
-  // 2 INPUT MODES: statertoken || loginInfo
-  const tokenStr = pluckAuthTokenFromEvent(e)
   const credsInputs = pluckCredentialsFromEvent(e)
 
-  // console.log(0, { tokenStr, credsInputs })
-
-  if (hasAllCreds(credsInputs)) {
-    const exID = credsInputs.email as string
-    const credUser = await user.lookupVia({ typeID: 'email', exID })
-  
-    let maxl25:string[] = []
-    // token data beats creds
-    if (tokenStr) {
-      const jwtUser = await jwtVerify<JWTObjectOutput>()(tokenStr).then(u => { maxl25 = u.maxl25; return u })
-      if (credUser && jwtUser.email) {
-        credUser.email = jwtUser.email
-      }
-      if (credUser && jwtUser.uacct) {
-        credUser.uacct = jwtUser.uacct
-      }
-    }
-
-    // console.log(1, 'hasAllCreds')
-
-    return validate(
-      postFinalTokenResponder,
-      { ...credsInputs, ...credUser, maxl25 } as IAuthzFlat,
-      emailShouldBeProvided,
-      emailAddressShouldBeValid,
-      passShouldBeProvidedAndValid,
-      challengeTOTPShouldBeValid,
-      emailCredentialShouldMatchTheEmailInTheAuthToken,
-    )(e, c)
-  } else if (credsInputs.email) {
-    // only given partial login info
-    // console.log(2, 'validated POST: has email')
-
-    const credUser = await user.lookupVia({ typeID: 'email', exID: credsInputs.email })
-
-    return validate(
-      postStarterTokenResponder,
-      { ...credsInputs, ...credUser } as IAuthzFlat,
-      emailShouldBeProvided,
-      emailAddressShouldBeValid,
-      passShouldBeProvidedAndValid,
-    )(e, c)
-  } else {
-    // console.log(3, 'validated POST base case')
-    return validate(
-      postStarterTokenResponder,
-      { ...credsInputs } as IAuthzFlat,
-      emailShouldBeProvided,
-      emailAddressShouldBeValid,
-      passShouldBeProvidedAndValid
-    )(e, c)
-  }
-}
-
-export const postFinalTokenResponder:Responder<IAuthzFlatRequired> = async (data, event, ctx) => {
-  // console.log('postFinalTokenResponder', data)
-  const { email, uacct, maxl25 } = data
-  const { backupCodes, p, pwHash, oobTokens, TFAchallengeResp, TFAtype, ...usr } = data
-  const authToken = await sign({ email, uacct, maxl25 })
-  return {
-    statusCode: 200,
-    isBase64Encoded: false,
-    cookies: [`authToken=${authToken}`],
-    body: JSON.stringify({ authToken, user: usr })
-  } as SRet
-}
-
-export const postStarterTokenResponder:Responder<IAuthzFlatRequired> = async (data, event, ctx) => {
-  // console.log('postStarterTokenResponder', data)
-  const { email, uacct } = data
-  const starterToken = await sign({ email, uacct, maxl25: [] })
-  return {
-    statusCode: 200,
-    isBase64Encoded: false,
-    cookies: [`starterToken=${starterToken}`],
-    body: JSON.stringify({ starterToken })
-  } as SRet
-}
-
-export const validatedGET:IFunc = async (e, c) => {
-  const tokenStr = pluckAuthTokenFromEvent(e)
-  const creds = pluckCredentialsFromEvent(e)
-
-  const jwtUser = await jwtVerify<JWTObjectOutput>()(tokenStr)
-    .then(async (jwtOb: JWTObjectInput) =>
-      jwtOb.uacct
-        ? await user.getByID(jwtOb.uacct)
-        : await user.lookupVia({ typeID: 'email', exID: creds.email })
-    ).catch(er => undefined)
-
-  // console.log('1.validateGET', { jwtUser, creds })
-
-  const auzhZData = {
-    ...creds,
-    ...jwtUser
-  } as IAuthzFlat
-
   return validate(
-    getResponder,
-    auzhZData,
-    authTokenShouldBeProvided,
-    authTokenShouldBeValid
+    postFinalTokenResponder,
+    { ...credsInputs } as IAuthzFlat,
+    async () => {
+      return {
+        code: 400,
+        passed: hasAllCreds(credsInputs),
+        reason: 'All Credentials Must be prodivded',
+        InvalidDataLoc: '[H>Q>C].email, [H>Q>C].p, [H>Q>C].TFAtype, [H>Q>C].TFAchallengeResp',
+        InvalidDataVal: JSON.stringify(credsInputs, null, 2)
+      }
+    },
+    emailShouldBeProvided,
+    emailAddressShouldBeValid('user'),
+    passShouldBeProvidedAndValid,
+    challengeTOTPShouldBeValid
   )(e, c)
 }
 
-export const getResponder:Responder<IAuthzFlatRequired> = async (d, e, c) => {
-  const { uacct, maxl25, email, p, TFAtype, TFAchallengeResp, backupCodes, pwHash, oobTokens, ...usr } = d
-  const nextAuthToken = await sign({ uacct, email, maxl25 })
+export const postFinalTokenResponder:Responder<unknown> = async (data, event, ctx, extras) => {
+  const paramUsr = extras.user as IUser
+  const { backupCodes, pwHash, oobTokens, cts, mts, entity, ...usr } = paramUsr
+  const authToken = (await accessToken().create({ email: usr.email, uacct: usr.uacct, last25: usr.last25 })).token
+
+  // console.log({ usr, u: extras.user})
+
   return {
     statusCode: 200,
-    isBase64Encoded: false,
-    cookies: [`authToken=${nextAuthToken}`],
-    body: JSON.stringify({
+    ...await compressableJson(
+      {
+        headers: CORSHeaderEntries,
+        cookies: [`authToken=${authToken}`]
+      }
+    )(event,
+      {
+        authToken,
+        user: usr as IUserPublic
+      }
+    )
+  }
+}
+
+// export const postStarterTokenResponder:Responder<IAuthzFlatRequired> = async (data, event, ctx) => {
+//   // console.log('postStarterTokenResponder', data)
+//   const { email, uacct } = data
+//   const starterToken = (await accessToken().create({ email, uacct, last25: []})).token
+//   return {
+//     statusCode: 200,
+//     isBase64Encoded: false,
+//     cookies: [`starterToken=${starterToken}`],
+//     body: JSON.stringify({ starterToken })
+//   } as SRet
+// }
+
+export const validatedGET:IFunc = async (e, c) => {
+  const tokenStr = pluckAuthTokenFromEvent(e)
+  // const creds = pluckCredentialsFromEvent(e)
+
+  const rejector = validate(
+    getResponder,
+    {} as IAccessTokenData,
+    authTokenShouldBeProvided,
+    authTokenShouldBeValid
+  )
+
+  if (tokenStr) {
+    const jwtUser = await accessToken()
+      .fromString(tokenStr)
+      .then(d => d.obj)
+      .catch(er => undefined)
+    if (jwtUser) {
+      return validate(
+        getResponder,
+        jwtUser as IAccessTokenData,
+        authTokenShouldBeProvided,
+        authTokenShouldBeValid
+      )(e, c)
+    } else {
+      return rejector(e, c)
+    }
+  } else {
+    return rejector(e, c)
+  }
+}
+
+export const getResponder:Responder<IAccessTokenData> = async (d, e, c) => {
+  const { uacct, last25, email } = d
+  const nextAuthToken = (await accessToken().create({ uacct, email, last25 })).token
+
+  return {
+    statusCode: 200,
+    ...await compressableJson({
+      headers: CORSHeaderEntries,
+      cookies: [`authToken=${nextAuthToken}`]
+    })(e, {
       refreshedAuthToken: nextAuthToken,
-      user: { ...usr, uacct },
+      user: d,
       delegateStarterTokens: [], // I am a helper for these accounts, and they can revoke my access
       revocableDelegationStarterTokens: [] // I have these helpers for my account
     })
@@ -194,7 +187,7 @@ export const getResponder:Responder<IAuthzFlatRequired> = async (d, e, c) => {
  * @param e.[[headers][queryStringParameters][cookies]].authtoken
  * @param c Context
  */
-export const get: IFunc = async (e, c) => validatedGET(e, c)
+export const get = validatedGET
 
 /**
  * POST :: loginInfo -> starterToken -> (+2FA)-> token
@@ -206,7 +199,7 @@ export const get: IFunc = async (e, c) => validatedGET(e, c)
  * @param e.[[headers][queryStringParameters][cookies]].TFAtype
  * @param c Context
  */
-export const post: IFunc = async (e, c) => validatedPOST(e, c)
+export const post = validatedPOST
 
 /**
  * PUT :: token -> token
@@ -214,7 +207,7 @@ export const post: IFunc = async (e, c) => validatedPOST(e, c)
  * @param e.[[headers][queryStringParameters][cookies]].authtoken
  * @param c Context
  */
-export const put: IFunc = async (e, c) => validatedPOST(e, c)
+export const put = validatedPOST
 
 /**
  * DELE :: token -> confimationMessage
@@ -222,7 +215,7 @@ export const put: IFunc = async (e, c) => validatedPOST(e, c)
  * @param e.[[headers][queryStringParameters][cookies]].authtoken
  * @param c Context
  */
-export const dele: IFunc = async (e, c) => validatedPOST(e, c)
+export const dele = validatedPOST
 
 export const handler:IFunc = baseHandle({ get, post, put, dele })
 export default handler

@@ -88,3 +88,5 @@ export interface IRequestContext_Http{
 
 export type RequestContext = Partial<IRequestContext>
 type Dict<T> = {[name:string]:T}
+
+// console.log(JSON.stringify(event("GET",'/expand/me'),null, 2))

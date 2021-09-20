@@ -94,6 +94,13 @@ describe('Test Harness to Deal with Click Events',()=>{
 
     test.skip('How many cliks for this link1', async()=>{})
     test.skip('How many cliks for this link2', async()=>{})
+
+
+    test.todo('lines: 54')
+    test.todo('lines: 71-78')
+    test.todo('lines: 139')
+    test.todo('lines: 145-158')
+
 })
 
 

@@ -1,15 +1,19 @@
 import emc from '../client/index'
+import dotenv from 'dotenv'
+import {resolve} from 'path'
+import {readFileSync} from 'fs'
+
+const vars = dotenv.parse(readFileSync(resolve(__dirname, '../tools/user.env')).toString())
 
 const baseURL = 'https://8wpbgn8oo4.execute-api.us-west-2.amazonaws.com'
 const emoore = emc(baseURL)
 
 beforeAll(async ()=>{
-    const r = await emoore.post.tokens({email:'ericdmoore', passphrase:'??', TFA:'???'})
-    console.log({r})
+    // saves AuthToken into client
+    await emoore.post.tokens({email:'ericdmoore', passphrase:vars.PASSWORD, TFA:'GET FROM AUTHY Before running'})
 })
 
 describe('/tokens',()=>{
-    
     test('preTest Init worked', ()=>{
         expect(emoore.authToken).not.toEqual('missing')
     })

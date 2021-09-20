@@ -7,7 +7,7 @@
 import type { IFunc, SRet, Responder, JWTelementsExtras } from '../types'
 // import type { IUser } from '../entities/users'
 import { user, IUser } from '../entities'
-// import { jwtSign, jwtVerify } from '../auths/validJWT'
+
 import baseHandle from '../utils/methodsHandler'
 import validate from './validations'
 import {
@@ -27,8 +27,8 @@ import {
   authTokenShouldContainValidUacct
 } from '../validators/tokens'
 
-import { jsonResp, textResp, respSelector } from '../utils/SRetFormat'
-// import { jwtVerify } from '../auths/validJWT'
+// import { accessToken } from '../auths/validJWT'
+import { jsonResp, respSelector } from '../utils/SRetFormat'
 
 // #region interfaces
 export interface IUserSetupInfo{
@@ -84,39 +84,40 @@ const validatedGET: IFunc = async (e, c) => {
   )(e, c)
 }
 
-const rmoveOobToken = async (uacct: string| IUser, tokenLabel:string)=>{
+const rmoveOobToken = async (uacct: string| IUser, tokenLabel:string) => {
   const u:IUser = typeof uacct === 'string' ? await user.getByID(uacct) : uacct
   const priorNumTokens = u.oobTokens.length
-  const rmTOTPoptionIdx = u.oobTokens.reduce((_,oob, i)=> oob.userLabel === tokenLabel ? i : -1, -1)
-  if(rmTOTPoptionIdx !== -1){
-    await user.ent.update({uacct: u.uacct, oobTokens: { $remove: [rmTOTPoptionIdx] }})
-    return {u, tokenCount: priorNumTokens -1}
-  }else{
-    return {u, tokenCount: priorNumTokens}
+  const rmTOTPoptionIdx = u.oobTokens.reduce((_, oob, i) => oob.userLabel === tokenLabel ? i : -1, -1)
+  if (rmTOTPoptionIdx !== -1) {
+    await user.ent.update({ uacct: u.uacct, oobTokens: { $remove: [rmTOTPoptionIdx] } })
+    return { u, tokenCount: priorNumTokens - 1 }
+  } else {
+    return { u, tokenCount: priorNumTokens }
   }
 }
 
 // PUT
 const putResponder : Responder<{}> = async (d, e, c, sidecars) => {
   const userBeforeChange = sidecars.validUacct as unknown as IUser
-  const { refreshBackupCodes, plaintextPassword, addTOTP, rmTOTP, ...updates} = pluckUpdateFields(e) 
+
+  const { refreshBackupCodes, plaintextPassword, addTOTP, rmTOTP, ...updates } = pluckUpdateFields(e)
   const addBackupCodes = refreshBackupCodes ? { backupCodes: await user.otp.genBackups() } : {}
   const TOTPdetails = await user.otp.gen2FA(userBeforeChange.uacct, 'TOTP', addTOTP)
   const priorNumTokens = userBeforeChange.oobTokens.length
-  const rmTOTPoptionIdx = userBeforeChange.oobTokens.reduce((_,oob, i)=> oob.userLabel === rmTOTP ? i : -1, -1)
+  const rmTOTPoptionIdx = userBeforeChange.oobTokens.reduce((_, oob, i) => oob.userLabel === rmTOTP ? i : -1, -1)
 
   const userUdpates = {
     ...updates,
     ...addBackupCodes,
-    ...( addTOTP ? { oobTokens: { $append: [TOTPdetails] }}: {}),
-    ...( rmTOTPoptionIdx !== -1 ? { oobTokens: { $remove: [rmTOTPoptionIdx] }}: {}),
-    ...( plaintextPassword ? { pwHash: await user.password.toHash(plaintextPassword)} : {}),
+    ...(addTOTP ? { oobTokens: { $append: [TOTPdetails] } } : {}),
+    ...(rmTOTPoptionIdx !== -1 ? { oobTokens: { $remove: [rmTOTPoptionIdx] } } : {}),
+    ...(plaintextPassword ? { pwHash: await user.password.toHash(plaintextPassword) } : {}),
     uacct: userBeforeChange.uacct
   }
 
   await user.ent.update(userUdpates)
   // const updatedUser = await user.getByID(userBeforeChange.uacct)
-  
+
   return {
     statusCode: 200,
     ...await compressJsonBasedOnEvent()(e, {
@@ -124,29 +125,33 @@ const putResponder : Responder<{}> = async (d, e, c, sidecars) => {
       user: {
         uacct: userUdpates.uacct,
         email: userUdpates.email ?? userBeforeChange.email,
-        displayName: userUdpates.displayName ?? userBeforeChange.displayName,
+        displayName: userUdpates.displayName ?? userBeforeChange.displayName
       },
-      ...(addTOTP ? {
-          TOTPdetails: {
-            strategy: TOTPdetails.strategy,
-            label: TOTPdetails.userLabel,
-            uri: TOTPdetails,
-          } 
-        } : {}
+      ...(addTOTP
+        ? {
+            TOTPdetails: {
+              strategy: TOTPdetails.strategy,
+              label: TOTPdetails.userLabel,
+              uri: TOTPdetails
+            }
+          }
+        : {}
       ),
-      ...(rmTOTP ? {
-          TOTPdetails: {
-            wasRemoved: rmTOTPoptionIdx !== -1,
-            tokensRemaining: rmTOTPoptionIdx === -1 ? priorNumTokens : priorNumTokens - 1
-          } 
-        } : {}
+      ...(rmTOTP
+        ? {
+            TOTPdetails: {
+              wasRemoved: rmTOTPoptionIdx !== -1,
+              tokensRemaining: rmTOTPoptionIdx === -1 ? priorNumTokens : priorNumTokens - 1
+            }
+          }
+        : {}
       )
     })
   } as SRet
 }
 
 const validatedPUT: IFunc = validate(
-  putResponder, 
+  putResponder,
   {},
   authTokenShouldBeProvided,
   authTokenShouldBeValid,
@@ -164,7 +169,7 @@ const postResponder: Responder<Required<FlatPostUserInfo>> = async (d, e, c) => 
   const userResp = {
     uacct: usr.uacct,
     email: usr.email,
-    displayName: usr.displayName,
+    displayName: usr.displayName
     // delegation: usr.delegation
   }
 
@@ -178,36 +183,37 @@ const validatedPOST: IFunc = async (e, c) => {
   const acceptanceTok = pluckAcceptanceToken(e)
   const uInfo = pluckUserSetupInfo(e)
 
+  // console.log({ uInfo, acceptanceTok })
+
   return validate(
     postResponder,
     { acceptanceTok, ...uInfo },
     userShouldNotPrexist,
     hasAllRequiredFields(
       ['email', 'plaintextPassword'],
-      `To Add A User - Provide All Required Field: ['email','plaintextPassword']`),
+      'To Add A User - Provide All Required Field: [\'email\',\'plaintextPassword\']'),
     acceptanceTokenSigShouldMatchInlineInfo
   )(e, c)
 }
 
 // DELE
 const deleResponder: Responder<{}> = async (d, e, c, sidecars) => {
-  const u = sidecars.validUacct  as IUser
+  const u = sidecars.validUacct as IUser
   const deleInfo = pluckDeleteFields(e)
   const removed = {} as {[str:string]:unknown }
-  
-  if(deleInfo.rmTOTPlabel){
-    const {tokenCount} = await rmoveOobToken(u.uacct, deleInfo.rmTOTPlabel)
-    removed['oobToken'] = {tokenCount}
+
+  if (deleInfo.rmTOTPlabel) {
+    const { tokenCount } = await rmoveOobToken(u.uacct, deleInfo.rmTOTPlabel)
+    removed.oobToken = { tokenCount }
   }
-  if(deleInfo.rmUacctID){
-    await user.ent.delete({uacct: u.uacct}) 
-    removed['uacct'] = {uacct: u.uacct}
+  if (deleInfo.rmUacctID) {
+    await user.ent.delete({ uacct: u.uacct })
+    removed.uacct = { uacct: u.uacct }
   }
-  if(deleInfo.rmDelegateToken){
-    removed['delegate'] = {token: deleInfo.rmDelegateToken, msg: 'this actually did not work yet'}
+  if (deleInfo.rmDelegateToken) {
+    removed.delegate = { token: deleInfo.rmDelegateToken, msg: 'this actually did not work yet' }
   }
 
-  
   return {
     statusCode: 200,
     ...await compressJsonBasedOnEvent()(e, { removed })

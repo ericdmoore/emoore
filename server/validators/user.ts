@@ -1,26 +1,27 @@
 import type { ValidationTest } from '../funcs/validations'
 import type { Evt } from '../types'
-import type { FlatPostUserInfo, IAcceptanceTokenOutput } from '../funcs/users'
+import type { FlatPostUserInfo } from '../funcs/users'
 import { user } from '../entities'
-import { jwtVerify } from '../auths/validJWT'
-import first from '../utils/first'
+import { acceptanceToken } from '../auths/tokens'
+// import first from '../utils/first'
 import { deepStrictEqual } from 'assert'
 import { pluckDataFor } from '../utils/pluckData'
 import { hasElements } from '../utils/objectKeyCheck'
 import { btoa } from '../utils/base64'
 // import { btoa } from '../utils/base64'
 
-const verify = jwtVerify<IAcceptanceTokenOutput>()
 const deepEq = (a:any, o:any) => {
   try { deepStrictEqual(a, o); return true } catch (e) { return false }
 }
 
-export const pluckAcceptanceToken = (e:Evt) => first(
-  [
-    pluckDataFor('acceptanceToken'),
-    pluckDataFor('token')
-  ].map(f => f(e, undefined))
-)
+/**
+ * An Acceptance Token is the mechanism where new users
+ * can be approved by the people/the system and be sent an invation link
+ * that holds the approved information - and the users would then
+ * create/confirm their account by logging in :)
+ * @param e
+ */
+export const pluckAcceptanceToken = (e:Evt) => pluckDataFor('acceptanceToken')(e, undefined)
 
 export const pluckUserSetupInfo = (e:Evt) => {
   const auto = pluckDataFor('auto')(e, undefined)
@@ -30,11 +31,11 @@ export const pluckUserSetupInfo = (e:Evt) => {
   const uacct = pluckDataFor('uacct')(e, undefined)
 
   return {
+    uacct,
     auto: auto === '1' || auto === 'true',
     email: email ? decodeURIComponent(email) : undefined,
     displayName: displayName ? decodeURIComponent(displayName) : undefined,
-    plaintextPassword: plaintextPassword ? btoa(plaintextPassword) : undefined,
-    uacct,
+    plaintextPassword: plaintextPassword ? btoa(plaintextPassword) : undefined
   }
 }
 
@@ -83,13 +84,12 @@ export const reqHasUpdatableFields: ValidationTest<Partial<FlatPostUserInfo>> = 
   }
 }
 
-
 export const userShouldNotPrexist: ValidationTest<Partial<FlatPostUserInfo>> = async (e) => {
   const userInfo = pluckUserSetupInfo(e)
 
   const [uByEmail, uByUacct] = await Promise.all([
     userInfo.uacct ? user.getByID(userInfo.uacct) : Promise.resolve(undefined),
-    userInfo.email ? user.lookupVia({typeID:'email',exID: userInfo.email}) : Promise.resolve(undefined)
+    userInfo.email ? user.lookupVia({ typeID: 'email', exID: userInfo.email }) : Promise.resolve(undefined)
   ])
 
   return {
@@ -102,70 +102,44 @@ export const userShouldNotPrexist: ValidationTest<Partial<FlatPostUserInfo>> = a
   }
 }
 
-
 export const hasAllRequiredFields = (keys:string[], reason:string): ValidationTest<FlatPostUserInfo> => async (e) => {
   return {
     code: 400,
     reason,
     passed: hasElements(...keys)(pluckUserSetupInfo(e)),
-    InvalidDataLoc: keys.map(k=>`[H>Q>C].${k})`).join(', '),
+    InvalidDataLoc: keys.map(k => `[H>Q>C].${k})`).join(', '),
     InvalidDataVal: '',
     docRef: ''
   }
 }
 
 export const acceptanceTokenSigShouldMatchInlineInfo: ValidationTest<FlatPostUserInfo> = async (e, c, d) => {
-  const accTokenStr = pluckAcceptanceToken(e)
-  const {
-    alg,
-    typ,
-    kid,
-    iat,
-    exp,
-    iss,
-    sub,
-    aud,
-    nbf,
-    jti, 
-    ...accTokenObj
-  } = await verify(accTokenStr).catch(() => ({
-    iat: null,
-    exp: null,
-    iss: null,
-    alg: null,
-    typ: null,
-    kid: null,
-    sub: null,
-    aud: null,
-    nbf: null,
-    jti: null,
-    email: undefined,
-    displayName: undefined,
-    plaintextPassword: undefined,
-    uacct: undefined
-  }))
-  const { auto, ...userInfo } = pluckUserSetupInfo(e)
+  const { acceptanceTok, ...uInfo } = d
+  const { obj } = await acceptanceToken().fromString(acceptanceTok ?? '')
+
+  // const { auto, ...userInfo } = pluckUserSetupInfo(e)
 
   const passed = deepEq({
-    email: accTokenObj.email,
-    displayName: accTokenObj.displayName,
-    plaintextPassword: accTokenObj.plaintextPassword
+    uacct: obj.uacct,
+    email: obj.email,
+    plaintextPassword: obj.plaintextPassword
   }, {
-    email: userInfo.email,
-    displayName: userInfo.displayName,
-    plaintextPassword: userInfo.plaintextPassword
+    uacct: uInfo.uacct,
+    email: uInfo.email,
+    plaintextPassword: uInfo.plaintextPassword
   })
-  
+
+  // console.log({ obj, uInfo, passed })
+
   // console.log({ accTokenObj, userInfo })
   // console.log({ passed })
 
-
   return {
     code: 400,
-    reason: 'The AcceptanceToken and the Information Provided DONOT Match',
     passed,
-    InvalidDataLoc: `[H>Q>C].authToken, [H>Q>C].email,  [H>Q>C].displayName, [H>Q>C].plaintextPassword`,
-    InvalidDataVal: JSON.stringify(userInfo),
+    reason: 'The AcceptanceToken and the Information Provided DONOT Match',
+    InvalidDataLoc: '[H>Q>C].authToken, [H>Q>C].email,  [H>Q>C].displayName, [H>Q>C].plaintextPassword',
+    InvalidDataVal: JSON.stringify(uInfo),
     docRef: ''
   }
 }

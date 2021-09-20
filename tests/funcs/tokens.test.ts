@@ -11,13 +11,14 @@ Overview
 */
 
 import type { SRet } from '../../server/types'
+// import type { UseBase } from '../../server/entities/users'
 import handler from '../../server/funcs/tokens'
-import { user, appTable } from '../../server/entities'
+import { user } from '../../server/entities'
 import { event, ctx } from '../gatewayData'
 import { nanoid } from 'nanoid'
-import { userLookup } from '../../server/entities/userLookup'
+// import { userLookup } from '../../server/entities/userLookup'
 import { atob } from '../../server/utils/base64'
-import { jwtSign, jwtVerify } from '../../server/auths/validJWT'
+import { accessToken, jwtSign } from '../../server/auths/validJWT'
 import { authenticator } from 'otplib'
 
 const userList = [
@@ -41,51 +42,43 @@ const userList = [
   }
 ]
 
-// problem
-// sig assumes server-side can impute the plaintext password
-// it can not
-// so instead of sending an hmac sig
-// consider sending a p: base64(plainTextPassword)
-//
-
-const signToken = jwtSign()
-const verifyToken = jwtVerify()
-
 beforeAll(async () => {
-  // load table data
-  await appTable.batchWrite(
-    await Promise.all(
-      userList.map(async u => {
-        const { email, plaintextPassword, ...usr } = u
-        return user.ent.putBatch({
-          ...usr,
-          email: u.email,
-          pwHash: await user.password.toHash(plaintextPassword),
-          backupCodes: await user.otp.genBackups(),
-          oobTokens: [await user.otp.gen2FA(u.uacct, 'TOTP', 'initial TOTP')]
-        })
-      })
-    ))// end user batch
+  await user.batch.put(...userList)
 
-  await Promise.all([
-    ...userList.map(
-      async u => user.addExternalID(u.uacct, 'email', u.email)
-    )
-  ])
+  // // load table data
+  // await appTable.batchWrite(
+  //   await Promise.all(
+  //     userList.map(async u => {
+  //       const { email, plaintextPassword, ...usr } = u
+  //       return user.ent.putBatch({
+  //         ...usr,
+  //         email: u.email,
+  //         pwHash: await user.password.toHash(plaintextPassword),
+  //         backupCodes: await user.otp.genBackups(),
+  //         oobTokens: [await user.otp.gen2FA(u.uacct, 'TOTP', 'initial TOTP')]
+  //       })
+  //     })
+  //   ))// end user batch
+  //
+  // await Promise.all([
+  //   ...userList.map(
+  //     async u => user.addExternalID(u.uacct, 'email', u.email)
+  //   )
+  // ])
 })
 
 afterAll(async () => {
+  await user.batch.rm(...userList)
+
   // remove table data
   // so as to not interfere with other test-suites
-  await appTable.batchWrite(
-    userList.map(u => user.ent.deleteBatch(u))
-  )
-  await appTable.batchWrite(
-    userList.map(u => userLookup.ent.deleteBatch({ exID: u.email, typeID: 'email' }))
-  )
+  // await appTable.batchWrite(
+  //   userList.map(u => user.ent.deleteBatch(u))
+  // )
+  // await appTable.batchWrite(
+  //   userList.map(u => userLookup.ent.deleteBatch({ exID: u.email, typeID: 'email' }))
+  // )
 })
-
-
 
 describe('POST /tokens', () => {
   // beforeEach(async () => {})
@@ -93,7 +86,10 @@ describe('POST /tokens', () => {
 
   const postEvent = event('POST', '/tokens')
 
-  test('Make a starter token for YOOSir - the starter + OOB gives you a valid token', async () => {
+  /**
+   * @todo remove this test - as this use case is no longer supported
+   */
+  test.skip('Make a starter token for YOOSir - the starter + OOB gives you a valid token', async () => {
     const user = userList[0]
     const e = { ...postEvent }
     e.headers = {
@@ -105,8 +101,37 @@ describe('POST /tokens', () => {
 
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
+    expect(body).toHaveProperty('starterToken')
+
+    const respObjToken = (await accessToken().fromString(body.starterToken)).obj
+    const exampleTokObj = (await accessToken().create({ email: user.email, uacct: user.uacct, last25: [] })).obj
+
+    expect(respObjToken).toEqual(exampleTokObj)
+  })
+
+  /**
+   * @todo remove as this is no longer a supported use case
+   */
+  test.skip('Send token + Credentials', async () => {
+    const user = userList[0]
+    const e = { ...postEvent }
+    e.headers = {
+      authToken: (await accessToken().create({
+        email: user.email,
+        last25: [],
+        uacct: user.uacct
+      })).token,
+      uacct: user.uacct,
+      email: encodeURIComponent(user.email),
+      p: atob(user.plaintextPassword)
+    }
+    const resp = await handler(e, ctx) as SRet
+    const body = (JSON.parse(resp.body ?? 'null') as any)
+
+    expect(resp.statusCode).toBe(200)
+    expect(resp.isBase64Encoded).toBe(false)
     expect(body).toEqual({
-      starterToken: await signToken({ email: user.email, uacct: user.uacct, maxl25: [] })
+      starterToken: (await accessToken().create({ email: user.email, uacct: user.uacct, last25: [] })).token
     })
   })
 
@@ -114,8 +139,8 @@ describe('POST /tokens', () => {
     const { uacct, email, plaintextPassword } = userList[0]
     const usr = await user.getByID(uacct)
 
-    const e = { 
-      ...postEvent, 
+    const e = {
+      ...postEvent,
       headers: {
         email: encodeURIComponent(email),
         p: atob(plaintextPassword),
@@ -125,14 +150,22 @@ describe('POST /tokens', () => {
         )
       }
     }
-    
+
+    // console.dir({e, ctx})
     const resp = await handler(e, ctx) as SRet
+    // console.dir(resp)
+
     const body = (JSON.parse(resp.body ?? 'null') as any)
+    // console.dir(body)
+
+    const { obj } = await accessToken().fromString(body?.authToken)
+    // console.dir(obj)
 
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
     expect(body).toHaveProperty('authToken')
-    expect(body?.authToken).toEqual(await signToken({ email, uacct, maxl25: [] }))
+    expect(body).toHaveProperty('user')
+    expect(obj).toEqual({ email: usr.email, uacct: usr.uacct, last25: usr?.last25 ?? [] })
   })
 
   test('Send in Nothing ', async () => {
@@ -160,6 +193,7 @@ describe('POST /tokens', () => {
     const starterTokenBody = (JSON.parse(startTokenResp.body ?? '{}') as {starterToken?:string})
 
     const { starterToken } = starterTokenBody
+
     const completeTokenResp = await handler({
       ...event('POST', '/tokens'),
       headers: {
@@ -182,17 +216,20 @@ describe('POST /tokens', () => {
     expect(completeTokenBody).toHaveProperty('user')
   })
 
-  test('Token and Creds are out of step', async () => {
+  /**
+   * Maybe this test passes now since we dont care about tokens
+   */
+  test('Only Creds Matter - Token is ignored', async () => {
     const e = { ...postEvent }
     const { uacct, email, plaintextPassword } = userList[0]
     const usr = await user.getByID(uacct).catch(er => ({ oobTokens: [] }))
 
     e.headers = {
-      authToken: await signToken({
+      authToken: (await accessToken().create({
         uacct,
-        maxl25: [],
-        email: 'mismatchedEmail@example.com'
-      }),
+        email: 'mismatchedEmail@example.com',
+        last25: []
+      })).token,
       email: encodeURIComponent(email),
       p: atob(plaintextPassword),
       TFAtype: 'TOTP',
@@ -204,18 +241,22 @@ describe('POST /tokens', () => {
     const resp = await handler(e, ctx) as SRet
     const body = (JSON.parse(resp.body ?? 'null') as any)
 
-    expect(resp.statusCode).toBe(400)
+    expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
-    expect(body).toHaveProperty('errors')
+    expect(body).toHaveProperty('authToken')
+    expect(body).toHaveProperty('user')
   })
 
-  test('Valid but old Token that`s missing a uacct', async () => {
+  /**
+   * @todo #premature optimization
+   */
+  test.skip('Valid but old Token that`s missing a uacct', async () => {
     const { uacct, email, plaintextPassword } = userList[0]
     const usr = await user.getByID(uacct)
 
     const e = { ...postEvent }
     e.headers = {
-      authToken: await signToken({ email, maxl25: [] }),
+      authToken: await jwtSign()({ email, last25: [] }),
       email: encodeURIComponent(email),
       p: atob(plaintextPassword),
       TFAtype: 'TOTP',
@@ -229,10 +270,13 @@ describe('POST /tokens', () => {
     const body = (JSON.parse(resp.body ?? 'null') as any)
     // console.log({ body })
 
+    const respAuthToken = (await accessToken().fromString(body.authToken)).obj
+    const exampleToken = (await accessToken().create({ email, uacct, last25: [] })).obj
+
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
     expect(body).toHaveProperty('authToken')
-    expect(body?.authToken).toEqual(await signToken({ email, uacct, maxl25: [] }))
+    expect(respAuthToken).toEqual(exampleToken)
   })
 
   test('Bad Password Request', async () => {
@@ -252,18 +296,19 @@ describe('POST /tokens', () => {
 
     expect(resp.statusCode).toBe(400)
     expect(resp.isBase64Encoded).toBe(false)
-    expect(body).toHaveProperty(['errors'])
-    // expect(body?.authToken).toEqual(await jwtSign()({ email, uacct, maxl25: [] }))
+    expect(body).toHaveProperty('errors')
   })
 
   test('AuthToken + Creds Request', async () => {
     const { uacct, email, plaintextPassword } = userList[0]
     const usr = await user.getByID(uacct)
-    const maxl25 = ['/hello', '/world']
+    const last25 = ['/hello', '/world']
+
+    const initalAuthToken = (await accessToken().create(({ uacct, email, last25 }))).token
 
     const e = { ...postEvent }
     e.headers = {
-      authToken: await signToken({ uacct, email, maxl25 }),
+      authToken: initalAuthToken,
       email: encodeURIComponent(email),
       p: atob(plaintextPassword),
       TFAtype: 'TOTP',
@@ -275,23 +320,26 @@ describe('POST /tokens', () => {
     const resp = await handler(e, ctx) as SRet
     const body = (JSON.parse(resp.body ?? 'null') as any)
 
-    // console.log({ e })
-    // console.log({ body })
+    const respAuthToken = (await accessToken().fromString(body.authToken)).obj
+    await expect(accessToken().isVerified(body.authToken)).resolves.toBe(true)
 
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
-    expect(body).toHaveProperty(['authToken'])
-    expect(body?.authToken).toEqual(await jwtSign()({ email, uacct, maxl25 }))
+    expect(body).toHaveProperty('authToken')
+
+    expect(respAuthToken).toHaveProperty('email')
+    expect(respAuthToken).toHaveProperty('uacct')
+    expect(respAuthToken).toHaveProperty('last25')
   })
 
   test('Missing Email Request', async () => {
     const { uacct, email, plaintextPassword } = userList[2]
     const usr = await user.getByID(uacct)
-    const maxl25 = ['/hello', '/world']
+    const last25 = ['/hello', '/world']
 
     const e = { ...postEvent }
     e.headers = {
-      authToken: await signToken({ uacct, email, maxl25 }),
+      authToken: (await accessToken().create({ uacct, email, last25 })).token,
       p: atob(plaintextPassword),
       TFAtype: 'TOTP',
       TFAchallengeResp: authenticator.generate(
@@ -339,17 +387,19 @@ describe('GET /tokens', () => {
   test('Get tokens available for Yoo', async () => {
     const { uacct, email } = userList[0]
     // const usr = await user.getByID(uacct)
-    const initalAuthToken = await signToken({ uacct, email, maxl25: [] })
+    const initialJWT = await accessToken().create({ uacct, email, last25: [] })
+    const e = { ...GETevent, headers: { authToken: initialJWT.token } }
 
-    const e = { ...GETevent }
-    e.headers = { authToken: initalAuthToken }
-
-    // console.log({ e })
+    // console.log({ token, e })
     const resp = await handler(e, ctx) as SRet
-    const body = (JSON.parse(resp.body ?? 'null') as any)
+    const body = (JSON.parse(resp?.body ?? 'null') as any)
 
-    const refreshedJWT = await verifyToken(body.refreshedAuthToken) as any
-    const initialJWTobj = await verifyToken(initalAuthToken) as any
+    // console.dir({ resp, body })
+
+    await expect(accessToken().isVerified(body.refreshedAuthToken)).resolves.toBeTruthy()
+    const refreshedJWT = await accessToken().fromString(body.refreshedAuthToken)
+
+    // console.log({ initialJWT, refreshedJWT })
 
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
@@ -357,14 +407,45 @@ describe('GET /tokens', () => {
     expect(body).toHaveProperty('user')
     expect(body).toHaveProperty('delegateStarterTokens')
     expect(body).toHaveProperty('revocableDelegationStarterTokens')
-    expect(refreshedJWT.iat).toBeGreaterThanOrEqual(initialJWTobj.iat)
-    expect(refreshedJWT.exp).toBeGreaterThanOrEqual(initialJWTobj.exp)
+    expect(refreshedJWT.headers.iat).toBeGreaterThanOrEqual(initialJWT.headers.iat ?? Infinity)
+    expect(refreshedJWT.headers.exp).toBeGreaterThanOrEqual(initialJWT.headers.exp ?? Infinity)
   })
 
-  test('Invalid Request for Yoo', async () => {
+  test('Get tokens for Yoo w/ an Invalid Token', async () => {
     const { uacct, email } = userList[0]
     // const usr = await user.getByID(uacct)
-    const initalAuthToken = await jwtSign('_Not The Righyt Key_')({ uacct, email, maxl25: [] })
+    const initialJWT = await accessToken('bad secret').create({ uacct, email, last25: [] })
+    const e = { ...GETevent, headers: { authToken: initialJWT.token } }
+
+    // console.log({ token, e })
+    const resp = await handler(e, ctx) as SRet
+    const body = (JSON.parse(resp?.body ?? 'null') as any)
+
+    expect(resp.statusCode).toBe(400)
+    expect(resp.isBase64Encoded).toBe(false)
+    expect(body).toHaveProperty('errors')
+  })
+
+  test('Get tokens for Yoo but forgets to give a Token', async () => {
+    // const { uacct, email } = userList[0]
+    // const usr = await user.getByID(uacct)
+
+    // console.log({ token, e })
+    const resp = await handler(GETevent, ctx) as SRet
+    const body = (JSON.parse(resp?.body ?? 'null') as any)
+
+    expect(resp.statusCode).toBe(400)
+    expect(resp.isBase64Encoded).toBe(false)
+    expect(body).toHaveProperty('errors')
+  })
+
+  /**
+   * @todo decide if we can remove this since we are moving to a biz object pattern that encapsulates the input and output types
+   */
+  test.skip('Invalid Request for Yoo', async () => {
+    const { uacct, email } = userList[0]
+    // const usr = await user.getByID(uacct)
+    const initalAuthToken = await jwtSign('_Not The Righyt Key_')({ uacct, email, last25: [] })
 
     const e = { ...GETevent }
     e.headers = { authToken: initalAuthToken }
@@ -399,10 +480,10 @@ describe('DELETE /tokens', () => {
   // test('Revoke a delegation token for Yoo', async () => {})
 })
 
-
 describe.skip('delegation via  tokens', () => {
   // eslint-disable-next-line no-unused-vars
   const tokEvt = event('DELETE', '/tokens')
-
-  // test('Revoke a delegation token for Yoo', async () => {})
+  test.skip('Revoke a delegation token for Yoo', async () => {
+    console.log(tokEvt)
+  })
 })
