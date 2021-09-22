@@ -8,8 +8,10 @@ import { formatRelative } from 'date-fns'
 
 import globby from 'globby'
 import { plot } from 'asciichart'
+import * as asciichart from 'asciichart'
 import boxen from 'boxen'
 import getopts from 'getopts'
+import chalk from 'chalk'
 
 const FILELOC = './lastLineCountData.ndjson'
 const FILEPATH = resolve(__dirname, FILELOC)
@@ -37,6 +39,19 @@ interface StatsPerRun{
   fileCharCount:FilenameToNumber
   fileLineCount:FilenameToNumber
   time: number
+}
+
+interface BoxPlotOutput{
+  min: number
+  q1: number
+  median: number
+  avg: number
+  q3: number
+  max: number
+  N: number
+  totalLOC: number
+  box: string
+  axis: string
 }
 
 type ColectedRuns = StatsPerRun[]
@@ -188,7 +203,7 @@ const fillAsciiStrWithData = (
   }
 }
 
-const makeBoxPlot = (series:number[], cfg = { maxLen: 80, print: true }) => {
+const makeBoxPlot = (series:number[], cfg = { maxLen: 80, print: true }):BoxPlotOutput => {
   const localNums = [...series].sort(asc)
   const min = Math.min(...localNums)
   const max = Math.max(...localNums)
@@ -234,12 +249,54 @@ const compareRuns = async (comparisonMeta:{title:string}, currentSeries:StatsPer
         return [k, statsData]
       })
       .slice(0, lookBackOnKRecent)
-  )
+  ) as {[dateBasedName:string]: BoxPlotOutput}
 
   // console.log('Current Stats')
   const { box, axis, ...current } = makeBoxPlot(Object.values(currentSeries.fileLineCount), { maxLen: 100, print: false })
 
+  const minSeries = [current.min, ...Object.entries(renamedHistorical5).map(([, v]) => v.min)]
+  const q1Series = [current.q1, ...Object.entries(renamedHistorical5).map(([, v]) => v.q1)]
+  const medianSeries = [current.median, ...Object.entries(renamedHistorical5).map(([, v]) => v.median)]
+  const avgSeries = [current.avg, ...Object.entries(renamedHistorical5).map(([, v]) => v.avg)]
+  const q3Series = [current.q3, ...Object.entries(renamedHistorical5).map(([, v]) => v.q3)]
+  const maxSeries = [current.max, ...Object.entries(renamedHistorical5).map(([, v]) => v.max)]
+  const NSeries = [current.N, ...Object.entries(renamedHistorical5).map(([, v]) => v.N)]
+  // const LOCSeries = [current.totalLOC, ...Object.entries(renamedHistorical5).map(([, v]) => v.totalLOC)]
+
   console.table({ current, ...renamedHistorical5 })
+
+  console.log(
+    chalk.cyan('min'),
+    chalk.greenBright('q1'),
+    chalk.green('med'),
+    chalk.yellowBright('avg'),
+    chalk.yellow('q3'),
+    chalk.magenta('max'),
+    chalk.redBright('N')
+  )
+  console.log(plot([minSeries, q1Series, medianSeries, avgSeries, q3Series, maxSeries, NSeries], {
+    height: 20,
+    colors: [
+      asciichart.cyan, // min
+      asciichart.lightgreen, // q1
+      asciichart.green, // med
+      asciichart.lightyellow, // avg
+      asciichart.yellow, // q3
+      asciichart.lightmagenta, // max
+      asciichart.lightred // N
+      // asciichart.red // TLOC
+    ]
+  }))
+  console.log(
+    chalk.cyan('min'),
+    chalk.greenBright('q1'),
+    chalk.green('med'),
+    chalk.yellowBright('avg'),
+    chalk.yellow('q3'),
+    chalk.magenta('max'),
+    chalk.redBright('N')
+  )
+
   console.log('\n\n')
 }
 
