@@ -46,7 +46,10 @@ jobs:
       run: make viewEnv
 
     - name: Make Creds File
-      run: echo '[default]\naws_access_key_id=${{ env.AWS_KEY }}\naws_secret_access_key=${{ env.AWS_SECRET }}' > /home/runner/.aws/credentials
+      run: |
+        mkdir -p /home/runner/.aws
+        touch /home/runner/.aws/credentials
+        echo '[default]\naws_access_key_id=${{ env.AWS_KEY }}\naws_secret_access_key=${{ env.AWS_SECRET }}' > /home/runner/.aws/credentials
 
     - name: Read Creds File
       run: cat /home/runner/.aws/credentials
