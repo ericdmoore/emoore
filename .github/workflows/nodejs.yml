@@ -45,11 +45,13 @@ jobs:
     - name: Env Check
       run: make viewEnv
 
-    - name: Make Creds File
+    - name: Setup AWS Files [config + credentials]
       run: |
         mkdir -p /home/runner/.aws
         touch /home/runner/.aws/credentials
+        touch /home/runner/.aws/config
         echo '[default]\naws_access_key_id=${{ env.AWS_KEY }}\naws_secret_access_key=${{ env.AWS_SECRET }}' > /home/runner/.aws/credentials
+        echo '[default]\nregion=us-west-2\noutput=table' > /home/runner/.aws/config
 
     - name: Read Creds File
       run: cat /home/runner/.aws/credentials
