@@ -14,11 +14,12 @@ import type { IFunc, SRet } from '../types'
 export const handler: IFunc = async () => {
   // const desc = await dyn.describeTable({ TableName: appTable.name }).promise()
   // console.log(desc)
-  return { statusCode: 300, 
-    headers: {  
-      Location:       'https://im.ericdmoore.com',
-      'X-Developer': 'https://github.com/ericdmoore/emoore/wiki',
-    } 
+  return {
+    statusCode: 300,
+    headers: {
+      Location: 'https://im.ericdmoore.com',
+      'X-Developer': 'https://github.com/ericdmoore/emoore/wiki'
+    }
   } as SRet
 }
 

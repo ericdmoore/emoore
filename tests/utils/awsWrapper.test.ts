@@ -4,9 +4,11 @@
  */
 
 import { runOnLambda } from '../../server/utils/aws-lambda-wrapper'
-import { Lambda, SharedIniFileCredentials } from 'aws-sdk'
+import { Lambda, Credentials, SharedIniFileCredentials } from 'aws-sdk'
 
-const credentials = new SharedIniFileCredentials({ profile: 'personal_default' })
+const credentials = process.env?.AWS_KEY
+  ? new Credentials({ accessKeyId: process.env.AWS_KEY, secretAccessKey: process.env.AWS_SECRET as string })
+  : new SharedIniFileCredentials({ profile: 'personal_default' })
 
 test('Assert `RealWrapperTestUtil` is available', async () => {
   const l = new Lambda({ credentials, region: 'us-west-2' })
