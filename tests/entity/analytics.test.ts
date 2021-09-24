@@ -1,8 +1,6 @@
 /* globals test expect beforeAll  afterAll  */
 
-// import { DynamoDB } from 'aws-sdk'
 import { DocumentClient } from 'aws-sdk/clients/dynamodb'
-// import { DynamoDB } from 'aws-sdk'
 import { appTable, click } from '../../server/entities'
 import chunky from '../../server/utils/batchChunks'
 
