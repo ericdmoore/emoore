@@ -11,6 +11,6 @@
 // import { jwtVerify } from '../auths/validJWT.skip-ts'
 // import { hasElements } from '../utils/objectKeyCheck'
 
-export const hasProperRole = (...roles:string[]) => async (e:Evt) => {
-  return false
-}
+// export const hasProperRole = (...roles:string[]) => async (e:Evt) => {
+//   return false
+// }
