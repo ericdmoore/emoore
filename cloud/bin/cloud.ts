@@ -11,9 +11,6 @@ import { config } from 'dotenv'
 import { Functions } from '../lib/functions'
 import { APIGateway } from '../lib/gateway'
 
-// eslint-disable-next-line no-unused-vars
-const processenv = config().parsed ?? {}
-
 // #region interfaces
 
 // eslint-disable-next-line no-unused-vars
@@ -36,6 +33,9 @@ type FnReadyForGateway = GatewaySrcConfig & {fn:lambda.Function}
 
 // #endregion interfaces
 
+console.error({ env1: process.env })
+const processenv = config().parsed ?? {}
+
 // FUNC MANIFEST
 const modules = ['clicks', 'links', 'stats', 'tokens', 'users']
 const init: {[routeName:string]:GatewaySrcConfig} = {
@@ -44,14 +44,13 @@ const init: {[routeName:string]:GatewaySrcConfig} = {
 }
 const funcs = modules.reduce((p, c) => ({ ...p, [c]: { path: `/${c}`, src: [`${c}.ts`], methods: [apigV2.HttpMethod.ANY] } }), init)
 
-console.log({ env: process.env })
-
 ;(async () => {
   const app = new cdk.App()
 
   const cdkStack = new EmooreStack(app, 'EmooreStack', {
     stackName: 'emoore-stack',
-    description: 'A short link application for shrinking and expanding'
+    description: 'A short link application for shrinking and expanding',
+    env: { account: '172002748884', region: 'us-west-2' }
     /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
   })
 
@@ -64,8 +63,8 @@ console.log({ env: process.env })
     .bundleLambdas({}, {
       external: ['aws-sdk', 'mock-aws-s3', 'nock'],
       define: {
-        'process.env.AWS_KEY': `"${process.env.AWS_KEY ?? processenv.AWS_KEY}"`,
-        'process.env.AWS_SECRET': `"${process.env.AWS_SECRET ?? processenv.AWS_SECRET}"`
+        'process.env.AWS_KEY': `"${process.env.AWS_ACCESS_KEY_ID ?? processenv.AWS_ACCESS_KEY_ID}"`,
+        'process.env.AWS_SECRET': `"${process.env.AWS_SECRET_ACCESS_KEY ?? processenv.AWS_SECRET_ACCESS_KEY}"`
       }
     })
 
@@ -95,3 +94,5 @@ console.log({ env: process.env })
 
   //
 })().catch(console.error)
+
+console.error({ env2: process.env })
