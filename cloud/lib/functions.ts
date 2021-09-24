@@ -1,3 +1,5 @@
+/* eslint-disable no-unused-vars, camelcase */
+
 import type { BuildOptions } from 'esbuild'
 
 // import type { ZlibOptions } from 'zlib'
@@ -6,10 +8,9 @@ import { join, dirname, basename, extname, resolve } from 'path'
 import * as cdk from '@aws-cdk/core'
 import * as lambda from '@aws-cdk/aws-lambda'
 
-
 import AdmZip from 'adm-zip'
 import webpack from 'webpack'
-import type {Configuration, Stats} from 'webpack'
+import type { Configuration, Stats } from 'webpack'
 import { build as esbuild } from 'esbuild'
 
 // #region interfaces
@@ -26,20 +27,19 @@ const swapExt = (infile:string, newExt = '.zip') => join(
 
 // eslint-disable-next-line no-unused-vars
 const printJSON = (d:any) => console.log(JSON.stringify(d, null, 2))
-const webpackP = (cfg: Configuration) => new Promise((resolve, reject) => webpack( cfg, (er,stats)=> er ? reject(er) : resolve(stats as webpack.Stats) )) as Promise<webpack.Stats>
+const webpackP = (cfg: Configuration) => new Promise((resolve, reject) => webpack(cfg, (er, stats) => er ? reject(er) : resolve(stats as webpack.Stats))) as Promise<webpack.Stats>
 
 const webpackCfg_default: Configuration = {
-  target:'node', 
-  mode:'production',
-  resolve: { extensions: [ '.ts', '.tsx', '.js' ] },
-  externals:['aws-sdk', 'mock-aws-s3','nock'],
-  module: { 
-    rules: [ 
-      { test: /\.tsx?$/, loader: 'ts-loader' , exclude:'/node_modules/'} 
-    ] 
-  },
+  target: 'node',
+  mode: 'production',
+  resolve: { extensions: ['.ts', '.tsx', '.js'] },
+  externals: ['aws-sdk', 'mock-aws-s3', 'nock'],
+  module: {
+    rules: [
+      { test: /\.tsx?$/, loader: 'ts-loader', exclude: '/node_modules/' }
+    ]
+  }
 }
-
 
 export class Functions extends cdk.Construct {
   scope: cdk.Construct
@@ -114,58 +114,58 @@ export class Functions extends cdk.Construct {
 
     return Promise.all(
       Object.entries(this.props.srcPaths)
-      .map(([name, srcPath]) =>
-        esbuild({
-          treeShaking:true,
-          ...buildOpts,
-          bundle: true,
-          platform: 'node',
-          target: 'node14',
-          external: ['aws-sdk', 'mock-aws-s3', 'nock'].concat(buildOpts.external ?? [] ),
-          format: 'cjs',
-          // minify: true,
-          entryPoints: [srcPath],
-          outfile: this.props.bundledPaths[name]
-        })
-      )
+        .map(([name, srcPath]) =>
+          esbuild({
+            treeShaking: true,
+            ...buildOpts,
+            bundle: true,
+            platform: 'node',
+            target: 'node14',
+            external: ['aws-sdk', 'mock-aws-s3', 'nock'].concat(buildOpts.external ?? []),
+            format: 'cjs',
+            // minify: true,
+            entryPoints: [srcPath],
+            outfile: this.props.bundledPaths[name]
+          })
+        )
     )
   }
 
   /**
-   * 
+   *
    * @sideEffect
    */
-  async webpackBuildToDist(cfg: Configuration){
+  async webpackBuildToDist (cfg: Configuration) {
     const config = {
-      plugins:[
+      plugins: [
         new webpack.ProgressPlugin(),
         new webpack.PrefetchPlugin()
       ],
       entry: {
         expand: resolve(__dirname, '../../server/funcs/expand.ts'),
-        links:  resolve(__dirname, '../../server/funcs/links.ts'),
-        root:   resolve(__dirname, '../../server/funcs/root.ts'),
-        stats:  resolve(__dirname, '../../server/funcs/stats.ts'),
+        links: resolve(__dirname, '../../server/funcs/links.ts'),
+        root: resolve(__dirname, '../../server/funcs/root.ts'),
+        stats: resolve(__dirname, '../../server/funcs/stats.ts'),
         tokens: resolve(__dirname, '../../server/funcs/tokens.ts'),
-        users:  resolve(__dirname, '../../server/funcs/users.ts'),
+        users: resolve(__dirname, '../../server/funcs/users.ts')
       },
-      optimization:{
+      optimization: {
         innerGraph: true,
-        usedExports: true,
+        usedExports: true
       },
       ...cfg,
-      externals:['aws-sdk'].concat(cfg.externals as string[]),
-      output:{
-        path: resolve(__dirname,'../dist'),
-        filename: './[name]/index.js',
+      externals: ['aws-sdk'].concat(cfg.externals as string[]),
+      output: {
+        path: resolve(__dirname, '../dist'),
+        filename: './[name]/index.js'
       }
     } as Configuration
-    
+
     console.log(config)
     console.time('webpack')
     const stats = await webpackP(config) as Stats
     console.timeEnd('webpack')
-    stats.hasErrors() &&  console.error(stats.compilation.errors)
+    stats.hasErrors() && console.error(stats.compilation.errors)
     return stats
   }
 
@@ -187,7 +187,7 @@ export class Functions extends cdk.Construct {
     return Promise.all(
       Object.entries(this.props.bundledPaths)
         .map(async ([name, bundedPath]) => zipDir(name, bundedPath))
-    ) 
+    )
   }
 
   /**
@@ -201,12 +201,12 @@ export class Functions extends cdk.Construct {
     // console.time('esbuilds')
     await this.esbuildBundleToDist(applyBuildOpts)
     // console.timeEnd('esbuilds')
-    
+
     // const stats = await this.webpackBuildToDist(webpackCfg_default)
 
     // console.dir(stats)
     // // throw new Error("stop here")
-    
+
     await this.zipBundles()
 
     // printJSON(this.props)

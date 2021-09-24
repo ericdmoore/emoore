@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable no-new */
 // import * as iam from '@aws-cdk/aws-iam'
 // import 'source-map-support/register'
 import * as cdk from '@aws-cdk/core'
@@ -32,16 +33,18 @@ interface GatewaySrcConfig{
 }
 
 type FnReadyForGateway = GatewaySrcConfig & {fn:lambda.Function}
-  
+
 // #endregion interfaces
 
 // FUNC MANIFEST
-const modules = ['clicks','links','stats','tokens','users']
+const modules = ['clicks', 'links', 'stats', 'tokens', 'users']
 const init: {[routeName:string]:GatewaySrcConfig} = {
-  root:   { path: '/',               src: ['root.ts'],   methods: [apigV2.HttpMethod.GET] },
-  expand: { path: '/expand/{short}', src: ['expand.ts'], methods: [apigV2.HttpMethod.GET] },
+  root: { path: '/', src: ['root.ts'], methods: [apigV2.HttpMethod.GET] },
+  expand: { path: '/expand/{short}', src: ['expand.ts'], methods: [apigV2.HttpMethod.GET] }
 }
-const funcs = modules.reduce((p,c)=>({ ...p, [c] : {path:`/${c}`, src:[`${c}.ts`], methods: [apigV2.HttpMethod.ANY]} }), init)
+const funcs = modules.reduce((p, c) => ({ ...p, [c]: { path: `/${c}`, src: [`${c}.ts`], methods: [apigV2.HttpMethod.ANY] } }), init)
+
+console.log({ env: process.env })
 
 ;(async () => {
   const app = new cdk.App()
@@ -59,18 +62,18 @@ const funcs = modules.reduce((p,c)=>({ ...p, [c] : {path:`/${c}`, src:[`${c}.ts`
   const funcMap = await new Functions(cdkStack, 'id', 'dist')
     .addMoreFuncs(basePaths, funcs)
     .bundleLambdas({}, {
-      external: ['aws-sdk','mock-aws-s3', 'nock'],
+      external: ['aws-sdk', 'mock-aws-s3', 'nock'],
       define: {
-        'process.env.AWS_KEY': `"${processenv.AWS_KEY}"`,
-        'process.env.AWS_SECRET': `"${processenv.AWS_SECRET}"`
+        'process.env.AWS_KEY': `"${process.env.AWS_KEY ?? processenv.AWS_KEY}"`,
+        'process.env.AWS_SECRET': `"${process.env.AWS_SECRET ?? processenv.AWS_SECRET}"`
       }
     })
 
   const fns = Object.entries(funcs).reduce((p, [fnID, val]) => ({
     ...p,
-    [fnID]: { 
-      ...val, 
-      fn: funcMap[fnID] 
+    [fnID]: {
+      ...val,
+      fn: funcMap[fnID]
     }
   }), {} as {[fnID:string]:FnReadyForGateway})
 
@@ -78,7 +81,7 @@ const funcs = modules.reduce((p,c)=>({ ...p, [c] : {path:`/${c}`, src:[`${c}.ts`
     name: 'emoore API Gateway',
     desc: 'The Gateway for emoore functions'
   })
-  
+
   api.mergeRouteFunctions(fns)
   cdkStack.grant(fns)
 

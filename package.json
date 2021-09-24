@@ -31,7 +31,6 @@
     "@types/benchmark": "^2.1.0",
     "@types/boxen": "^3.0.1",
     "@types/d3-array": "^3.0.0",
-    "@types/dotenv": "^8.2.0",
     "@types/jest": "^26.0.22",
     "@types/jsonld": "^1.5.5",
     "@types/jsonwebtoken": "^8.5.2",

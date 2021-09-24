@@ -29,9 +29,9 @@ export class EmooreStack extends cdk.Stack {
     })
     this.bucket = new Bucket(this, 'fileBucket', { bucketName: 'emoore-links' })
   }
-  
-  grant (fnFuncs:{[fnName:string]:{fn: Function}}){
-    Object.values(fnFuncs).forEach(({fn})=>{
+
+  grant (fnFuncs:{[fnName:string]:{fn: Function}}) {
+    Object.values(fnFuncs).forEach(({ fn }) => {
       this.table.grantFullAccess(fn)
       this.bucket.grantReadWrite(fn)
     })
