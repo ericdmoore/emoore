@@ -83,7 +83,7 @@ afterAll(async () => {
   }
 }, TEST_TIMEOUT)
 
-test('query DataStore for Dashboard.1 - 01 Day', async () => {
+test.skip('query DataStore for Dashboard.1 - 01 Day', async () => {
   const short = 'ddg'
   const { tsHi, tsLo } = { tsHi: ts, tsLo: ts - msInDays(1) }
   const r = await click.query.usingRange({ short, start: tsLo, stop: tsHi })
@@ -94,7 +94,7 @@ test('query DataStore for Dashboard.1 - 01 Day', async () => {
   expect(r.ScannedCount).toBe(upTo400)
 }, TEST_TIMEOUT)
 
-test('query DataStore for Dashboard.2 - 04 Days', async () => {
+test.skip('query DataStore for Dashboard.2 - 04 Days', async () => {
   const short = 'ddg'
   const { tsHi, tsLo } = { tsHi: ts, tsLo: ts - msInDays(4) }
   const r = await click.query.usingRange({ short, start: tsLo, stop: tsHi })
@@ -105,7 +105,7 @@ test('query DataStore for Dashboard.2 - 04 Days', async () => {
   expect(r.ScannedCount).toBe(upTo400 * 2)
 }, TEST_TIMEOUT)
 
-test('query DataStore for Dashboard.3 - 14 Days', async () => {
+test.skip('query DataStore for Dashboard.3 - 14 Days', async () => {
   const short = 'ddg'
   const { tsHi, tsLo } = { tsHi: ts, tsLo: ts - msInDays(14) }
   const r = await click.query.usingRange({ short, start: tsLo, stop: tsHi })
@@ -116,7 +116,7 @@ test('query DataStore for Dashboard.3 - 14 Days', async () => {
   expect(r.ScannedCount).toBe(upTo400 * 3)
 }, TEST_TIMEOUT)
 
-test('query DataStore for Dashboard.4 - 90 Days', async () => {
+test.skip('query DataStore for Dashboard.4 - 90 Days', async () => {
   const short = 'ddg'
   const { tsHi, tsLo } = { tsHi: ts, tsLo: ts - msInDays(90) }
   const r = await click.query.usingRange({ short, start: tsLo, stop: tsHi })
