@@ -11,8 +11,6 @@ line-count:
 	npx ts-node -P ./node.tsconfig.json tools/linecount.ts -- server/**/*.ts
 
 
-
-
 rm-build:
 	rm -rf build/
 

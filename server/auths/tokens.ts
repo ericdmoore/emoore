@@ -1,8 +1,9 @@
 import type { JWTelementsExtras } from '../types'
 import jwt from 'jsonwebtoken'
 
-import { parse as dotenvparse } from 'dotenv'
+import dotenv from 'dotenv'
 import { readFileSync } from 'fs'
+import { stat } from 'fs/promises'
 import { resolve } from 'path'
 
 // #region interfaces
@@ -46,9 +47,11 @@ interface TypedVerifiedToken<T> {
 //   signature: string
 // }
 
-const envConfig = dotenvparse(readFileSync(resolve(__dirname, '../../cloud/.env')))
-export const JWT_SECRET = process.env.JWT_SECRET ?? envConfig.JWT_SECRET as string
-export const JWT_SECRET_ID = process.env.JWT_SECRET_ID ?? envConfig.JWT_SECRET_ID as string
+const FILEPATH = resolve(__dirname, '../../cloud/.env')
+const envConfig = dotenv.config({ path: FILEPATH }).parsed
+
+export const JWT_SECRET = process.env.JWT_SECRET ?? envConfig?.JWT_SECRET as string
+export const JWT_SECRET_ID = process.env.JWT_SECRET_ID ?? envConfig?.JWT_SECRET_ID as string
 export const ISSUER = 'co.federa'
 
 export const jwtVerify = <OutputType extends JWTelementsExtras>(secretOrPublicKey: jwt.Secret | jwt.GetPublicKeyOrSecret = JWT_SECRET) =>
