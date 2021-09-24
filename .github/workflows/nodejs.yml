@@ -30,8 +30,18 @@ jobs:
       run: make cloud-install
     - name: Build
       run: make build
+        AWS_KEY: ${{ secrets.AWS_KEY}}
+        AWS_SECRET: ${{ secrets.AWS_SECRET}}
+        AWS_SDK_LOAD_CONFIG: ${{ secrets.AWS_SDK_LOAD_CONFIG}}
+        JWT_SECRET: ${{ secrets.JWT_SECRET}}
+        JWT_SECRET_ID: ${{ secrets.JWT_SECRET_ID}}
+        TABLE_NAME: ${{ secrets.TABLE_NAME}}
     - name: Test 
       run: make test
       env:
-        AWS_KEY: ${{ secrets.AWS_KEY }}
-        AWS_SECRET: ${{ secrets.AWS_SECRET }}
+        AWS_KEY: ${{ secrets.AWS_KEY}}
+        AWS_SECRET: ${{ secrets.AWS_SECRET}}
+        AWS_SDK_LOAD_CONFIG: ${{ secrets.AWS_SDK_LOAD_CONFIG}}
+        JWT_SECRET: ${{ secrets.JWT_SECRET}}
+        JWT_SECRET_ID: ${{ secrets.JWT_SECRET_ID}}
+        TABLE_NAME: ${{ secrets.TABLE_NAME}}

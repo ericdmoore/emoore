@@ -56,7 +56,7 @@ export const JWT_SECRET = process.env.JWT_SECRET ?? envConfig?.JWT_SECRET as str
 export const JWT_SECRET_ID = process.env.JWT_SECRET_ID ?? envConfig?.JWT_SECRET_ID as string
 export const ISSUER = 'co.federa'
 
-console.log(`${ISSUER}//${JWT_SECRET_ID}//${JWT_SECRET}//`)
+console.log(`${ISSUER}--${JWT_SECRET_ID}--${JWT_SECRET}//`)
 
 export const jwtVerify = <OutputType extends JWTelementsExtras>(secretOrPublicKey: jwt.Secret | jwt.GetPublicKeyOrSecret = JWT_SECRET) =>
   (token: string | undefined, opts?: jwt.VerifyOptions) : Promise<OutputType> =>
