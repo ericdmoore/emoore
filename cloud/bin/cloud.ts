@@ -5,6 +5,7 @@
 import * as cdk from '@aws-cdk/core'
 import * as apigV2 from '@aws-cdk/aws-apigatewayv2'
 import * as lambda from '@aws-cdk/aws-lambda'
+import AWS from 'aws-sdk'
 
 import { EmooreStack } from '../lib/cloud-stack'
 import { config } from 'dotenv'
@@ -35,6 +36,11 @@ type FnReadyForGateway = GatewaySrcConfig & {fn:lambda.Function}
 
 console.error({ env1: process.env })
 const processenv = config().parsed ?? {}
+
+AWS.config.credentials = {
+  accessKeyId: `"${process.env.AWS_KEY ?? process.env.AWS_ACCESS_KEY_ID ?? processenv.AWS_ACCESS_KEY_ID}"`,
+  secretAccessKey: `"${process.env.AWS_SECRET ?? process.env.AWS_SECRET_ACCESS_KEY ?? processenv.AWS_SECRET_ACCESS_KEY}"`
+}
 
 // FUNC MANIFEST
 const modules = ['clicks', 'links', 'stats', 'tokens', 'users']
