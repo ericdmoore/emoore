@@ -24,6 +24,9 @@ jobs:
         JWT_SECRET: ${{ secrets.JWT_SECRET }}
         JWT_SECRET_ID: ${{ secrets.JWT_SECRET_ID }}
         TABLE_NAME: ${{ secrets.TABLE_NAME }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET }}
+
     steps:
     - uses: actions/checkout@v2
     - name: Use Node.js ${{ matrix.node-version }}
@@ -38,19 +41,5 @@ jobs:
       run: make viewEnv
     - name: Build
       run: make build
-      env:
-        AWS_KEY: ${{ secrets.AWS_KEY }}
-        AWS_SECRET: ${{ secrets.AWS_SECRET }}
-        AWS_SDK_LOAD_CONFIG: ${{ secrets.AWS_SDK_LOAD_CONFIG }}
-        JWT_SECRET: ${{ secrets.JWT_SECRET }}
-        JWT_SECRET_ID: ${{ secrets.JWT_SECRET_ID }}
-        TABLE_NAME: ${{ secrets.TABLE_NAME }}
     - name: Test 
       run: make test
-      env:
-        AWS_KEY: ${{ secrets.AWS_KEY }}
-        AWS_SECRET: ${{ secrets.AWS_SECRET }}
-        AWS_SDK_LOAD_CONFIG: ${{ secrets.AWS_SDK_LOAD_CONFIG }}
-        JWT_SECRET: ${{ secrets.JWT_SECRET }}
-        JWT_SECRET_ID: ${{ secrets.JWT_SECRET_ID }}
-        TABLE_NAME: ${{ secrets.TABLE_NAME }}
