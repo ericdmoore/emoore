@@ -4,7 +4,7 @@ TESTS = npx jest tests/*.test.ts tests/**/*.test.ts --coverage
 
 tests: test
 
-test:
+test: rm-build
 	npx jest tests/ --coverage
 
 line-count:
