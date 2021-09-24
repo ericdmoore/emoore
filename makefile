@@ -1,6 +1,7 @@
 INSPECTOR = npx graphql-inspector introspect
 LINTER = npx graphql-schema-linter
 TESTS = npx jest tests/*.test.ts tests/**/*.test.ts --coverage
+AWS_FILE = "[default]\naws_access_key_id=$AWS_ACCESS_KEY_ID\naws_secret_access_key=$AWS_SECRET_ACCESS_KEY
 
 tests: test
 
@@ -33,8 +34,13 @@ cloud-install:
 deploy: preflight build test rm-build postflight
 	cd cloud; pwd; npm run cdk deploy
 
-
-
+plopCreds:	
+ifeq ($(RUNNING_CI),true)
+	@echo "[default]\naws_access_key_id=$(AWS_ACCESS_KEY_ID)\naws_secret_access_key=$(AWS_SECRET_ACCESS_KEY)" > ~/.aws/credentials
+	@echo "Wrote a credential file"
+else
+	@echo "Hoy, The Credentials Are Here Already"
+endif
 
 preflight: build show-extras rm-build test line-count
 
