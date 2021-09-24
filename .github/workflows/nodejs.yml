@@ -30,6 +30,7 @@ jobs:
       run: make cloud-install
     - name: Build
       run: make build
+      env:
         AWS_KEY: ${{ secrets.AWS_KEY}}
         AWS_SECRET: ${{ secrets.AWS_SECRET}}
         AWS_SDK_LOAD_CONFIG: ${{ secrets.AWS_SDK_LOAD_CONFIG}}
