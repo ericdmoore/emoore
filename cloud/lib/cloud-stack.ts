@@ -18,8 +18,7 @@ export class EmooreStack extends cdk.Stack {
   functions: {[name:string]:lambda.Function} = {}
 
   constructor (scope: cdk.Construct, id: string, props?: cdk.StackProps) {
-    super(scope, id, props)
-
+    super(scope, id, { ...props })
     this.scope = scope
     this.table = new dynamodb.Table(this, 'EmooreAppTable', {
       tableName: 'emooreAppTable',

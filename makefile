@@ -24,6 +24,8 @@ build: build-code build-cloud
 	@echo Built Application Code And Cloud Comps
 
 
+viewEnv:
+	@echo printenv
 
 cloud-install:
 	cd cloud; npm i
