@@ -21,11 +21,20 @@ interface TwoFAStringSec {
    userLabel?: string
 }
 
+interface IOobTokenInput{
+  strategy:string
+  uri:string
+  secret:string
+  label?:string
+}
+
 export interface UseBase{
   email: string
-  uacct: string
   displayName:string
-  plaintextPassword: string
+  passwordPlainText: string
+  uacct?: string
+  oobTokens?: IOobTokenInput[]
+  backupCodes?: string[]
 }
 
 // @ref overview:  https://developers.yubico.com/U2F/Protocol_details/Overview.html
@@ -142,7 +151,7 @@ export const user = {
   /**
    * @writesDB
    * @param email -
-   * @param plaintextPassword
+   * @param passwordPlainText
    * @param uacctInput
    * @param displayName
    * @param delegateToUaccts
@@ -151,7 +160,7 @@ export const user = {
    */
   genUser: async (
     email: string,
-    plaintextPassword: string,
+    passwordPlainText: string,
     uacctInput?: string,
     displayName?: string,
     delegateToUaccts: string[] = [],
@@ -161,7 +170,7 @@ export const user = {
     const uacct = await user.mintUserID(uacctInput)
     const oobTokens = [...oobTokenInputs, await user.otp.gen2FA(uacct, 'TOTP')]
     const backupCodes = [...backupCodeInputs, ...await user.otp.genBackups()]
-    const pwHash = await user.password.toHash(plaintextPassword)
+    const pwHash = await user.password.toHash(passwordPlainText)
     const last25 = [] as string[]
 
     // delegation,
@@ -183,16 +192,20 @@ export const user = {
       userList.map(
         u => user.genUser(
           u.email,
-          u.plaintextPassword,
+          u.passwordPlainText,
           u.uacct,
-          u.displayName)
+          u.displayName,
+          undefined,
+          u.oobTokens,
+          u.backupCodes
+        )
       )
     ),
     rm: async (...userList:UseBase[]) => Promise.all([
-      appTable.batchWrite(userList.map(u => user.ent.deleteBatch(u))),
-      appTable.batchWrite(userList.map(u => userLookup.ent.deleteBatch({ exID: u.email, typeID: 'email' })))
+      user.ent.table.batchWrite(userList.map(u => user.ent.deleteBatch(u))),
+      user.ent.table.batchWrite(userList.map(u => userLookup.ent.deleteBatch({ exID: u.email, typeID: 'email' })))
     ]),
-    get: async (...userList:UseBase[]) => appTable.batchGet(userList.map(u => user.ent.getBatch(u)))
+    get: async (...userList:UseBase[]) => user.ent.table.batchGet(userList.map(u => user.ent.getBatch(u)))
   },
   password: {
     /**

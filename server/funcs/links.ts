@@ -9,7 +9,7 @@ import type { ValidationResp } from './validations'
 import baseHandle from '../utils/methodsHandler'
 import pluckDataFor from '../utils/pluckData'
 import validate from './validations'
-import { accessToken } from '../auths/validJWT'
+import { accessToken } from '../auths/tokens'
 import { respSelector, jsonResp } from '../utils/SRetFormat'
 import { link, userAccess } from '../entities'
 import {

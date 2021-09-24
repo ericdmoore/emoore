@@ -6,10 +6,10 @@
 
 import type { IFunc, SRet, Responder, NonNullObj } from '../types'
 import type { IUser } from '../entities/users'
-import type { IAccessTokenData } from '../auths/validJWT'
+
 // import type { ValidationResp } from './validations'
 
-import { accessToken } from '../auths/validJWT'
+import { accessToken, IAccessTokenData } from '../auths/tokens'
 import baseHandle from '../utils/methodsHandler'
 import validate from './validations'
 import {

@@ -9,7 +9,7 @@ test('basic root test', async () => {
     statusCode: 300,
     headers: {
       Location: 'https://im.ericdmoore.com',
-      "X-Developer": "https://github.com/ericdmoore/emoore/wiki",
+      'X-Developer': 'https://github.com/ericdmoore/emoore/wiki'
     }
   })
 })

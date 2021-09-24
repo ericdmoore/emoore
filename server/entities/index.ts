@@ -1,5 +1,5 @@
 export * from './clicks'
-export * from './linkClickBy'
+// export * from './linkClickBy'
 export * from './links'
 export * from './userAccess'
 export * from './users'

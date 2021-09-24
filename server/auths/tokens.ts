@@ -28,7 +28,7 @@ export interface IAccessTokenData extends JWTelementsExtras{
 export interface IAcceptanceTokenData extends JWTelementsExtras{
     email: string
     displayName: string
-    plaintextPassword: string
+    passwordPlainText: string
     uacct?: string
 }
 
@@ -132,24 +132,25 @@ export const acceptanceToken = (jwtSecret = JWT_SECRET) :ITokenStart<IAcceptance
       headers: { alg, typ, kid, iat, exp, iss, sub, aud, nbf, jti } as JWTelementsExtras
     })
   }
-
-  const fromString = async (token:string) => {
-    const tokObj = await jwtVerify(jwtSecret)(token)
-      .catch(er => { throw Error('Access Token Could Not Be Verfied') }) as unknown as TypedVerifiedToken<IAcceptanceTokenData>
-
-    // pluck out
-    const { iat, exp, iss, ...objData } = tokObj.payload
-
-    return ['email', 'displayName', 'plaintextPassword'].every(key => key in objData)
-      ? create(objData)
-      : Promise.reject(Error('AccessToken does not have a UACCT'))
-  }
-
   const isVerified = async (tokenStr:string, match:{iss:string, useDate: number} = { iss: ISSUER, useDate: Date.now() }) => {
-    const tokObj = await jwtVerify()(tokenStr)
-      .catch(er => { throw Error('Access Token Could Not Be Verfied') }) as unknown as TypedVerifiedToken<IAcceptanceTokenData>
+    const tokObj = await jwtVerify(jwtSecret)(tokenStr)
+      .catch(er => { Promise.reject(Error('Access Token Could Not Be Verfied')) }) as unknown as TypedVerifiedToken<IAcceptanceTokenData>
     const { iss, iat, exp, ...obj } = tokObj.payload
     return !!obj && iss === match.iss
+  }
+
+  const fromString = async (token:string) => {
+    const tokObj = await jwtVerify<IAcceptanceTokenData>(jwtSecret)(token).catch(er => null) as TypedVerifiedToken<IAcceptanceTokenData> | null
+
+    if (tokObj) {
+      // pluck out
+      const { iat, exp, iss, ...objData } = tokObj.payload
+      return ['email', 'displayName', 'passwordPlainText'].every(key => key in objData)
+        ? create(objData)
+        : Promise.reject(Error('AcceptanceTokens MUST have fields:"[email, displayName, passwordPlainText]"'))
+    } else {
+      return Promise.reject(Error('Access Token Could Not Be Verfied'))
+    }
   }
 
   return { create, isVerified, fromString }

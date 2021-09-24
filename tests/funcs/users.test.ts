@@ -1,8 +1,11 @@
 /* globals describe test expect  beforeAll afterAll */
 // beforeEach afterEach
 import type { Evt, SRet } from '../../server/types'
+import type { UseBase } from '../../server/entities/users'
+
 import handler from '../../server/funcs/users'
 import { user } from '../../server/entities'
+
 import { event, ctx } from '../gatewayData'
 import { nanoid } from 'nanoid'
 import { accessToken, acceptanceToken } from '../../server/auths/tokens'
@@ -27,21 +30,21 @@ export const userList = [
     email: 'users.user1@example.com',
     uacct: nanoid(12),
     displayName: 'Yoo Sir',
-    plaintextPassword: 'A not so very Bad password for Yoo'
+    passwordPlainText: 'A not so very Bad password for Yoo'
   },
   {
     email: 'users.TimEst@example.com',
     uacct: nanoid(12),
     displayName: 'T Est',
-    plaintextPassword: 'A not so very Bad password for Tim'
+    passwordPlainText: 'A not so very Bad password for Tim'
   },
   {
     email: 'users.mdma@example.com',
     uacct: nanoid(12),
     displayName: 'Molly',
-    plaintextPassword: 'A not so very Bad password for Molly'
+    passwordPlainText: 'A not so very Bad password for Molly'
   }
-]
+] as UseBase[]
 
 // const signAcceptanceToken = jwtSign<IUserInfo>()
 // const signAuthToken = jwtSign<JWTObjectInput>()
@@ -65,10 +68,10 @@ Overview
 * DELE :: token -> confimationMessage
 */
 
-const fmtUserInfo = (i:{email:string, displayName:string, plaintextPassword: string, uacct?:string}) => ({
+const fmtUserInfo = (i:{email:string, displayName:string, passwordPlainText: string, uacct?:string}) => ({
   email: encodeURIComponent(i.email),
   displayName: encodeURIComponent(i.displayName),
-  plaintextPassword: atob(i.plaintextPassword),
+  passwordPlainText: atob(i.passwordPlainText),
   uacct: i.uacct
 })
 
@@ -82,7 +85,7 @@ describe('POST /users', () => {
     const userInfo = {
       email: 'examplerA@example.com',
       displayName: 'Exampler Man',
-      plaintextPassword: 'A Very Plain Ol Password'
+      passwordPlainText: 'A Very Plain Ol Password'
     }
     const accToken = (await acceptanceToken().create(userInfo)).token
     const e = {
@@ -93,7 +96,7 @@ describe('POST /users', () => {
       }
     }
 
-    // console.log({ e })
+    console.log({ e })
     const resp = await handler(e, ctx) as SRet
     // console.log({ resp })
 
@@ -121,7 +124,7 @@ describe('POST /users', () => {
       AwesomePassword that keeps going for days so that the compression algo will kick in,
       AwesomePassword that keeps going for days so that the compression algo will kick in,
       AwesomePassword that keeps going for days so that the compression algo will kick in`,
-      plaintextPassword: ' This element is not included in the response so it does not make sense to make it terribly long'
+      passwordPlainText: ' This element is not included in the response so it does not make sense to make it terribly long'
     }
 
     const e = {
@@ -160,7 +163,7 @@ describe('POST /users', () => {
     const userInfo = {
       email: usr.email,
       displayName: usr.displayName,
-      plaintextPassword: usr.plaintextPassword
+      passwordPlainText: usr.passwordPlainText
     }
 
     const accToken = (await acceptanceToken().create(userInfo)).token
@@ -171,7 +174,7 @@ describe('POST /users', () => {
         ...userInfo,
         acceptanceToken: accToken,
         email: encodeURIComponent(userInfo.email),
-        plaintextPassword: atob(userInfo.plaintextPassword)
+        passwordPlainText: atob(userInfo.passwordPlainText)
       }
     }
 
@@ -190,7 +193,7 @@ describe('POST /users', () => {
     const userInfo = {
       email: usr.email,
       displayName: usr.displayName,
-      plaintextPassword: usr.plaintextPassword
+      passwordPlainText: usr.passwordPlainText
     }
 
     const accToken = (await acceptanceToken().create(userInfo)).token
@@ -202,7 +205,7 @@ describe('POST /users', () => {
         ...userInfo,
         acceptanceToken: accToken,
         email: encodeURIComponent(userInfo.email),
-        plaintextPassword: atob(userInfo.plaintextPassword)
+        passwordPlainText: atob(userInfo.passwordPlainText)
       }
     }
 
@@ -227,7 +230,7 @@ describe('POST /users', () => {
     const userInfo = {
       email: usr.email,
       displayName: usr.displayName,
-      plaintextPassword: usr.plaintextPassword,
+      passwordPlainText: usr.passwordPlainText,
       auto: true
     }
     // const acceptanceToken = await signAcceptanceToken()
@@ -240,7 +243,7 @@ describe('POST /users', () => {
         acceptanceToken: accToken,
         displayName: usr.displayName,
         email: encodeURIComponent(userInfo.email),
-        plaintextPassword: atob(userInfo.plaintextPassword)
+        passwordPlainText: atob(userInfo.passwordPlainText)
       }
     } as Evt
 
@@ -271,7 +274,7 @@ describe('GET /users', () => {
     const e = { ...GETevent }
     const { uacct, email } = userList[0]
 
-    const authToken = (await accessToken().create({ uacct, email, last25: [] })).token
+    const authToken = (await accessToken().create({ uacct: uacct as string, email, last25: [] })).token
     e.headers = { authToken }
 
     // const uTest = await user.getByID(uacct).catch(er => undefined)
@@ -291,7 +294,7 @@ describe('GET /users', () => {
     const e = { ...GETevent }
     const { uacct, email } = userList[0]
     // const usr = await user.getByID(uacct)
-    const authToken = (await accessToken('_Not The Righyt Key_').create({ uacct, email, last25: [] })).token
+    const authToken = (await accessToken('_Not The Righyt Key_').create({ uacct: uacct as string, email, last25: [] })).token
     e.headers = { authToken }
 
     const resp = await handler(e, ctx) as SRet
@@ -312,7 +315,7 @@ describe('PUT /users', () => {
   test('Change Password', async () => {
     const e = { ...putEvent }
     const { uacct, email } = userList[0]
-    const authToken = (await accessToken().create({ uacct, email, last25: [] })).token
+    const authToken = (await accessToken().create({ uacct: uacct as string, email, last25: [] })).token
     const newPlaintextPassword = 'an updatedPassword'
 
     e.headers = {
@@ -323,7 +326,7 @@ describe('PUT /users', () => {
     const resp = await handler(e, ctx) as SRet
     const body = (JSON.parse(resp.body ?? 'null') as any)
 
-    const uVerify = await user.getByID(uacct)
+    const uVerify = await user.getByID(uacct as string)
     // console.log({ resp })
 
     expect(resp.statusCode).toBe(200)
@@ -331,7 +334,7 @@ describe('PUT /users', () => {
     expect(body).toHaveProperty('user')
     expect(body.user.uacct).toEqual(uVerify.uacct)
     expect(
-      user.password.isValidForUser({ uacct, passwordPlainText: newPlaintextPassword })
+      user.password.isValidForUser({ uacct: uacct as string, passwordPlainText: newPlaintextPassword })
     ).toBeTruthy()
   })
 
@@ -342,7 +345,7 @@ describe('PUT /users', () => {
     const newDisplayName = 'I\'m the New DisplayName'
 
     e.headers = {
-      authToken: (await accessToken().create({ uacct, email, last25: [] })).token,
+      authToken: (await accessToken().create({ uacct: uacct as string, email, last25: [] })).token,
       newEmail: encodeURIComponent(newEmail),
       newDisplayName: encodeURIComponent(newDisplayName)
     }
@@ -362,14 +365,14 @@ describe('PUT /users', () => {
   test('Refresh Backup Codes for Yoo', async () => {
     const e = { ...putEvent }
     const { uacct, email } = userList[0]
-    const authToken = (await accessToken().create({ uacct, email, last25: [] })).token
+    const authToken = (await accessToken().create({ uacct: uacct as string, email, last25: [] })).token
 
-    const uBefore = await user.getByID(uacct)
+    const uBefore = await user.getByID(uacct as string)
     e.headers = { authToken, refreshBackupCodes: 'true' }
     const resp = await handler(e, ctx) as SRet
     const { err, data } = JSONparse(resp?.body ?? 'null')
     const body = data as any
-    const uAfter = await user.getByID(uacct)
+    const uAfter = await user.getByID(uacct as string)
 
     expect(err).toBeFalsy()
     expect(resp.statusCode).toBe(200)
@@ -382,14 +385,14 @@ describe('PUT /users', () => {
     const e = { ...putEvent }
     const { uacct, email } = userList[0]
 
-    const authToken = (await accessToken().create({ uacct, email, last25: [] })).token
+    const authToken = (await accessToken().create({ uacct: uacct as string, email, last25: [] })).token
     e.headers = { authToken, addTOTP: 'Add_Me_KEEP_ME_label' }
 
-    const uBefore = await user.getByID(uacct)
+    const uBefore = await user.getByID(uacct as string)
     const resp = await handler(e, ctx) as SRet
     const { err, data } = JSONparse(resp?.body ?? 'null')
     const body = data as any
-    const uAfter = await user.getByID(uacct)
+    const uAfter = await user.getByID(uacct as string)
 
     expect(err).toBeFalsy()
     expect(resp.statusCode).toBe(200)
@@ -407,16 +410,16 @@ describe('Removing user attributes /users', () => {
   test('Add then Remove a TOTP oobToken for Yoo', async () => {
     const e = { ...event('PUT', '/users') }
     const { uacct, email } = userList[0]
-    const authToken = (await accessToken().create({ uacct, email, last25: [] })).token
+    const authToken = (await accessToken().create({ uacct: uacct as string, email, last25: [] })).token
 
-    const uBefore = await user.getByID(uacct)
+    const uBefore = await user.getByID(uacct as string)
     e.headers = { authToken, addTOTP: 'Push/Pop_label' }
     await handler(e, ctx) as SRet
-    const uMiddle = await user.getByID(uacct)
+    const uMiddle = await user.getByID(uacct as string)
 
     e.headers = { authToken, rmTOTP: 'Push/Pop_label' }
     const respRm = await handler(e, ctx) as SRet
-    const uAfter = await user.getByID(uacct)
+    const uAfter = await user.getByID(uacct as string)
 
     const { err, data } = JSONparse(respRm.body ?? 'null')
     const body = data as any

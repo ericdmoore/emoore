@@ -2,16 +2,16 @@
 import {
   link,
   click,
-  linkClickCountsByMin,
-  linkClickCountsByTmb,
-  linkClickCountsByHr,
-  linkClickCountsByDay,
-  linkClickCountsByMonth,
-  linkClickCountsByYear,
+  // linkClickCountsByMin,
+  // linkClickCountsByTmb,
+  // linkClickCountsByHr,
+  // linkClickCountsByDay,
+  // linkClickCountsByMonth,
+  // linkClickCountsByYear,
   user,
   userAccess
 } from '../../server/entities'
-import dateFmt from '../../server/utils/dateFmt'
+// import dateFmt from '../../server/utils/dateFmt'
 
 type Dict<T> = {[key:string]:T}
 interface DynamoDBGetInputs{
@@ -21,89 +21,89 @@ interface DynamoDBGetInputs{
 
 // afterAll()
 
-test('Link Click Bucket by Min - DynDB Inputs', async () => {
-  const t = Date.now()
-  const short = 'ddg'
-  const idBucket = dateFmt('YYYYMMDDHHmm')(t)
-  const r = await linkClickCountsByMin.ent.get({ short }, { execute: false }) as unknown as DynamoDBGetInputs
+// test('Link Click Bucket by Min - DynDB Inputs', async () => {
+//   const t = Date.now()
+//   const short = 'ddg'
+//   const idBucket = dateFmt('YYYYMMDDHHmm')(t)
+//   const r = await linkClickCountsByMin.ent.get({ short }, { execute: false }) as unknown as DynamoDBGetInputs
 
-  expect(r).toHaveProperty('Key')
-  expect(r).toHaveProperty('TableName')
-  expect(r).toHaveProperty('Key.pk')
-  expect(r).toHaveProperty('Key.sk')
-  expect(r.Key.pk).toBe(linkClickCountsByMin.pk({ short }))
-  expect(r.Key.sk).toBe(linkClickCountsByMin.sk({ bucketID: idBucket }))
-})
+//   expect(r).toHaveProperty('Key')
+//   expect(r).toHaveProperty('TableName')
+//   expect(r).toHaveProperty('Key.pk')
+//   expect(r).toHaveProperty('Key.sk')
+//   expect(r.Key.pk).toBe(linkClickCountsByMin.pk({ short }))
+//   expect(r.Key.sk).toBe(linkClickCountsByMin.sk({ bucketID: idBucket }))
+// })
 
-test('Link Click Bucket by tmb - DynDB Inputs', async () => {
-  const t = Date.now()
-  const short = 'ddg'
-  const idBucket = dateFmt('YYYYMMDDHHtmb')(t)
-  const r = await linkClickCountsByTmb.ent.get({ short }, { execute: false }) as unknown as DynamoDBGetInputs
+// test('Link Click Bucket by tmb - DynDB Inputs', async () => {
+//   const t = Date.now()
+//   const short = 'ddg'
+//   const idBucket = dateFmt('YYYYMMDDHHtmb')(t)
+//   const r = await linkClickCountsByTmb.ent.get({ short }, { execute: false }) as unknown as DynamoDBGetInputs
 
-  expect(r).toHaveProperty('Key')
-  expect(r).toHaveProperty('TableName')
-  expect(r).toHaveProperty('Key.pk')
-  expect(r).toHaveProperty('Key.sk')
-  expect(r.Key.pk).toBe(linkClickCountsByTmb.pk({ short }))
-  expect(r.Key.sk).toBe(linkClickCountsByTmb.sk({ bucketID: idBucket }))
-})
+//   expect(r).toHaveProperty('Key')
+//   expect(r).toHaveProperty('TableName')
+//   expect(r).toHaveProperty('Key.pk')
+//   expect(r).toHaveProperty('Key.sk')
+//   expect(r.Key.pk).toBe(linkClickCountsByTmb.pk({ short }))
+//   expect(r.Key.sk).toBe(linkClickCountsByTmb.sk({ bucketID: idBucket }))
+// })
 
-test('Link Click Bucket by Hr - DynDB Inputs', async () => {
-  const t = Date.now()
-  const short = 'ddg'
-  const idBucket = dateFmt('YYYYMMDDHH')(t)
-  const r = await linkClickCountsByHr.ent.get({ short }, { execute: false }) as unknown as DynamoDBGetInputs
+// test('Link Click Bucket by Hr - DynDB Inputs', async () => {
+//   const t = Date.now()
+//   const short = 'ddg'
+//   const idBucket = dateFmt('YYYYMMDDHH')(t)
+//   const r = await linkClickCountsByHr.ent.get({ short }, { execute: false }) as unknown as DynamoDBGetInputs
 
-  expect(r).toHaveProperty('Key')
-  expect(r).toHaveProperty('TableName')
-  expect(r).toHaveProperty('Key.pk')
-  expect(r).toHaveProperty('Key.sk')
-  expect(r.Key.pk).toBe(linkClickCountsByHr.pk({ short }))
-  expect(r.Key.sk).toBe(linkClickCountsByHr.sk({ bucketID: idBucket }))
-})
+//   expect(r).toHaveProperty('Key')
+//   expect(r).toHaveProperty('TableName')
+//   expect(r).toHaveProperty('Key.pk')
+//   expect(r).toHaveProperty('Key.sk')
+//   expect(r.Key.pk).toBe(linkClickCountsByHr.pk({ short }))
+//   expect(r.Key.sk).toBe(linkClickCountsByHr.sk({ bucketID: idBucket }))
+// })
 
-test('Link Click Bucket by Day - DynDB Inputs', async () => {
-  const t = Date.now()
-  const short = 'ddg'
-  const idBucket = dateFmt('YYYYMMDD')(t)
-  const r = await linkClickCountsByDay.ent.get({ short }, { execute: false }) as unknown as DynamoDBGetInputs
+// test('Link Click Bucket by Day - DynDB Inputs', async () => {
+//   const t = Date.now()
+//   const short = 'ddg'
+//   const idBucket = dateFmt('YYYYMMDD')(t)
+//   const r = await linkClickCountsByDay.ent.get({ short }, { execute: false }) as unknown as DynamoDBGetInputs
 
-  expect(r).toHaveProperty('Key')
-  expect(r).toHaveProperty('TableName')
-  expect(r).toHaveProperty('Key.pk')
-  expect(r).toHaveProperty('Key.sk')
-  expect(r.Key.pk).toBe(linkClickCountsByDay.pk({ short }))
-  expect(r.Key.sk).toBe(linkClickCountsByDay.sk({ bucketID: idBucket }))
-})
+//   expect(r).toHaveProperty('Key')
+//   expect(r).toHaveProperty('TableName')
+//   expect(r).toHaveProperty('Key.pk')
+//   expect(r).toHaveProperty('Key.sk')
+//   expect(r.Key.pk).toBe(linkClickCountsByDay.pk({ short }))
+//   expect(r.Key.sk).toBe(linkClickCountsByDay.sk({ bucketID: idBucket }))
+// })
 
-test('Link Click Bucket by Month - DynDB Inputs', async () => {
-  const t = Date.now()
-  const short = 'ddg'
-  const idBucket = dateFmt('YYYYMM')(t)
-  const r = await linkClickCountsByMonth.ent.get({ short }, { execute: false }) as unknown as DynamoDBGetInputs
+// test('Link Click Bucket by Month - DynDB Inputs', async () => {
+//   const t = Date.now()
+//   const short = 'ddg'
+//   const idBucket = dateFmt('YYYYMM')(t)
+//   const r = await linkClickCountsByMonth.ent.get({ short }, { execute: false }) as unknown as DynamoDBGetInputs
 
-  expect(r).toHaveProperty('Key')
-  expect(r).toHaveProperty('TableName')
-  expect(r).toHaveProperty('Key.pk')
-  expect(r).toHaveProperty('Key.sk')
-  expect(r.Key.pk).toBe(linkClickCountsByMonth.pk({ short }))
-  expect(r.Key.sk).toBe(linkClickCountsByMonth.sk({ bucketID: idBucket }))
-})
+//   expect(r).toHaveProperty('Key')
+//   expect(r).toHaveProperty('TableName')
+//   expect(r).toHaveProperty('Key.pk')
+//   expect(r).toHaveProperty('Key.sk')
+//   expect(r.Key.pk).toBe(linkClickCountsByMonth.pk({ short }))
+//   expect(r.Key.sk).toBe(linkClickCountsByMonth.sk({ bucketID: idBucket }))
+// })
 
-test('Link Click Bucket by Year - DynDB Inputs', async () => {
-  const t = Date.now()
-  const short = 'ddg'
-  const idBucket = dateFmt('YYYY')(t)
-  const r = await linkClickCountsByYear.ent.get({ short }, { execute: false }) as unknown as DynamoDBGetInputs
+// test('Link Click Bucket by Year - DynDB Inputs', async () => {
+//   const t = Date.now()
+//   const short = 'ddg'
+//   const idBucket = dateFmt('YYYY')(t)
+//   const r = await linkClickCountsByYear.ent.get({ short }, { execute: false }) as unknown as DynamoDBGetInputs
 
-  expect(r).toHaveProperty('Key')
-  expect(r).toHaveProperty('TableName')
-  expect(r).toHaveProperty('Key.pk')
-  expect(r).toHaveProperty('Key.sk')
-  expect(r.Key.pk).toBe(linkClickCountsByYear.pk({ short }))
-  expect(r.Key.sk).toBe(linkClickCountsByYear.sk({ bucketID: idBucket }))
-})
+//   expect(r).toHaveProperty('Key')
+//   expect(r).toHaveProperty('TableName')
+//   expect(r).toHaveProperty('Key.pk')
+//   expect(r).toHaveProperty('Key.sk')
+//   expect(r.Key.pk).toBe(linkClickCountsByYear.pk({ short }))
+//   expect(r.Key.sk).toBe(linkClickCountsByYear.sk({ bucketID: idBucket }))
+// })
 
 test('Link - DynDB Inputs', async () => {
   const short = 'ddg'

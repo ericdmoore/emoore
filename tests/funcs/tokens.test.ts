@@ -18,7 +18,7 @@ import { event, ctx } from '../gatewayData'
 import { nanoid } from 'nanoid'
 // import { userLookup } from '../../server/entities/userLookup'
 import { atob } from '../../server/utils/base64'
-import { accessToken, jwtSign } from '../../server/auths/validJWT'
+import { accessToken } from '../../server/auths/tokens'
 import { authenticator } from 'otplib'
 
 const userList = [
@@ -26,19 +26,19 @@ const userList = [
     uacct: nanoid(12),
     email: 'tokens.user1@example.com',
     displayName: 'Yoo Sir',
-    plaintextPassword: 'A not so very Bad password for Yoo'
+    passwordPlainText: 'A not so very Bad password for Yoo'
   },
   {
     uacct: nanoid(12),
     email: 'tokens.TimEst@example.com',
     displayName: 'T Est',
-    plaintextPassword: 'A not so very Bad password for Tim'
+    passwordPlainText: 'A not so very Bad password for Tim'
   },
   {
     uacct: nanoid(12),
     email: 'tokens.mdma@example.com',
     displayName: 'Molly',
-    plaintextPassword: 'A not so very Bad password for Molly'
+    passwordPlainText: 'A not so very Bad password for Molly'
   }
 ]
 
@@ -94,7 +94,7 @@ describe('POST /tokens', () => {
     const e = { ...postEvent }
     e.headers = {
       email: encodeURIComponent(user.email),
-      p: atob(user.plaintextPassword)
+      p: atob(user.passwordPlainText)
     }
     const resp = await handler(e, ctx) as SRet
     const body = (JSON.parse(resp.body ?? 'null') as any)
@@ -123,7 +123,7 @@ describe('POST /tokens', () => {
       })).token,
       uacct: user.uacct,
       email: encodeURIComponent(user.email),
-      p: atob(user.plaintextPassword)
+      p: atob(user.passwordPlainText)
     }
     const resp = await handler(e, ctx) as SRet
     const body = (JSON.parse(resp.body ?? 'null') as any)
@@ -136,14 +136,14 @@ describe('POST /tokens', () => {
   })
 
   test('Make a complete token for YOOSir - the starter + OOB gives you a valid token', async () => {
-    const { uacct, email, plaintextPassword } = userList[0]
+    const { uacct, email, passwordPlainText } = userList[0]
     const usr = await user.getByID(uacct)
 
     const e = {
       ...postEvent,
       headers: {
         email: encodeURIComponent(email),
-        p: atob(plaintextPassword),
+        p: atob(passwordPlainText),
         TFAtype: 'TOTP',
         TFAchallengeResp: authenticator.generate(
           usr.oobTokens.filter(t => t.strategy === 'TOTP')[0].secret.toString()
@@ -178,14 +178,14 @@ describe('POST /tokens', () => {
   })
 
   test('First grab a StarterToken', async () => {
-    const { uacct, email, plaintextPassword } = userList[0]
+    const { uacct, email, passwordPlainText } = userList[0]
     const usr = await user.getByID(uacct)
 
     const e = {
       ...postEvent,
       headers: {
         email: encodeURIComponent(email),
-        p: atob(plaintextPassword)
+        p: atob(passwordPlainText)
       }
     }
 
@@ -199,7 +199,7 @@ describe('POST /tokens', () => {
       headers: {
         authToken: starterToken,
         email: encodeURIComponent(email),
-        p: atob(plaintextPassword),
+        p: atob(passwordPlainText),
         TFAtype: 'TOTP',
         TFAchallengeResp: authenticator.generate(
           usr.oobTokens.filter(t => t.strategy === 'TOTP')[0].secret.toString()
@@ -221,7 +221,7 @@ describe('POST /tokens', () => {
    */
   test('Only Creds Matter - Token is ignored', async () => {
     const e = { ...postEvent }
-    const { uacct, email, plaintextPassword } = userList[0]
+    const { uacct, email, passwordPlainText } = userList[0]
     const usr = await user.getByID(uacct).catch(er => ({ oobTokens: [] }))
 
     e.headers = {
@@ -231,7 +231,7 @@ describe('POST /tokens', () => {
         last25: []
       })).token,
       email: encodeURIComponent(email),
-      p: atob(plaintextPassword),
+      p: atob(passwordPlainText),
       TFAtype: 'TOTP',
       TFAchallengeResp: authenticator.generate(
         usr.oobTokens.filter(t => t.strategy === 'TOTP')[0].secret.toString()
@@ -251,14 +251,14 @@ describe('POST /tokens', () => {
    * @todo #premature optimization
    */
   test.skip('Valid but old Token that`s missing a uacct', async () => {
-    const { uacct, email, plaintextPassword } = userList[0]
+    const { uacct, email, passwordPlainText } = userList[0]
     const usr = await user.getByID(uacct)
 
     const e = { ...postEvent }
     e.headers = {
-      authToken: await jwtSign()({ email, last25: [] }),
+      authToken: (await accessToken().create({ email, uacct, last25: [] })).token,
       email: encodeURIComponent(email),
-      p: atob(plaintextPassword),
+      p: atob(passwordPlainText),
       TFAtype: 'TOTP',
       TFAchallengeResp: authenticator.generate(
         usr.oobTokens.filter(t => t.strategy === 'TOTP')[0].secret.toString()
@@ -300,7 +300,7 @@ describe('POST /tokens', () => {
   })
 
   test('AuthToken + Creds Request', async () => {
-    const { uacct, email, plaintextPassword } = userList[0]
+    const { uacct, email, passwordPlainText } = userList[0]
     const usr = await user.getByID(uacct)
     const last25 = ['/hello', '/world']
 
@@ -310,7 +310,7 @@ describe('POST /tokens', () => {
     e.headers = {
       authToken: initalAuthToken,
       email: encodeURIComponent(email),
-      p: atob(plaintextPassword),
+      p: atob(passwordPlainText),
       TFAtype: 'TOTP',
       TFAchallengeResp: authenticator.generate(
         usr.oobTokens.filter(t => t.strategy === 'TOTP')[0].secret.toString()
@@ -333,14 +333,14 @@ describe('POST /tokens', () => {
   })
 
   test('Missing Email Request', async () => {
-    const { uacct, email, plaintextPassword } = userList[2]
+    const { uacct, email, passwordPlainText } = userList[2]
     const usr = await user.getByID(uacct)
     const last25 = ['/hello', '/world']
 
     const e = { ...postEvent }
     e.headers = {
       authToken: (await accessToken().create({ uacct, email, last25 })).token,
-      p: atob(plaintextPassword),
+      p: atob(passwordPlainText),
       TFAtype: 'TOTP',
       TFAchallengeResp: authenticator.generate(
         usr.oobTokens.filter(t => t.strategy === 'TOTP')[0].secret.toString()
@@ -445,7 +445,7 @@ describe('GET /tokens', () => {
   test.skip('Invalid Request for Yoo', async () => {
     const { uacct, email } = userList[0]
     // const usr = await user.getByID(uacct)
-    const initalAuthToken = await jwtSign('_Not The Righyt Key_')({ uacct, email, last25: [] })
+    const initalAuthToken = (await accessToken('_Not The Righyt Key_').create({ email, uacct, last25: [] })).token
 
     const e = { ...GETevent }
     e.headers = { authToken: initalAuthToken }

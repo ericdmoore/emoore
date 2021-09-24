@@ -8,7 +8,7 @@ import { user } from '../entities'
 import { createHmac } from 'crypto'
 import { btoa } from '../utils/base64'
 import { pluckDataFor } from '../utils/pluckData'
-import { accessToken } from '../auths/validJWT'
+import { accessToken } from '../auths/tokens'
 import { hasElements } from '../utils/objectKeyCheck'
 
 // #region interfaces

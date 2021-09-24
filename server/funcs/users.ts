@@ -33,7 +33,7 @@ import { jsonResp, respSelector } from '../utils/SRetFormat'
 // #region interfaces
 export interface IUserSetupInfo{
   email?: string
-  plaintextPassword?: string
+  passwordPlainText?: string
   displayName?: string
   uacct?: string
   auto?: boolean
@@ -43,7 +43,7 @@ export interface IAcceptanceTokenInput{
   uacct?: string
   email: string
   displayName: string
-  plaintextPassword: string
+  passwordPlainText: string
 
 }
 export type IAcceptanceTokenOutput = JWTelementsExtras & IAcceptanceTokenInput
@@ -100,7 +100,7 @@ const rmoveOobToken = async (uacct: string| IUser, tokenLabel:string) => {
 const putResponder : Responder<{}> = async (d, e, c, sidecars) => {
   const userBeforeChange = sidecars.validUacct as unknown as IUser
 
-  const { refreshBackupCodes, plaintextPassword, addTOTP, rmTOTP, ...updates } = pluckUpdateFields(e)
+  const { refreshBackupCodes, passwordPlainText, addTOTP, rmTOTP, ...updates } = pluckUpdateFields(e)
   const addBackupCodes = refreshBackupCodes ? { backupCodes: await user.otp.genBackups() } : {}
   const TOTPdetails = await user.otp.gen2FA(userBeforeChange.uacct, 'TOTP', addTOTP)
   const priorNumTokens = userBeforeChange.oobTokens.length
@@ -111,7 +111,7 @@ const putResponder : Responder<{}> = async (d, e, c, sidecars) => {
     ...addBackupCodes,
     ...(addTOTP ? { oobTokens: { $append: [TOTPdetails] } } : {}),
     ...(rmTOTPoptionIdx !== -1 ? { oobTokens: { $remove: [rmTOTPoptionIdx] } } : {}),
-    ...(plaintextPassword ? { pwHash: await user.password.toHash(plaintextPassword) } : {}),
+    ...(passwordPlainText ? { pwHash: await user.password.toHash(passwordPlainText) } : {}),
     uacct: userBeforeChange.uacct
   }
 
@@ -162,7 +162,7 @@ const validatedPUT: IFunc = validate(
 const postResponder: Responder<Required<FlatPostUserInfo>> = async (d, e, c) => {
   const usr = await user.genUser(
     d.email as string,
-    d.plaintextPassword as string,
+    d.passwordPlainText as string,
     d.uacct as string | undefined,
     d.displayName as string | undefined
   )
@@ -190,8 +190,8 @@ const validatedPOST: IFunc = async (e, c) => {
     { acceptanceTok, ...uInfo },
     userShouldNotPrexist,
     hasAllRequiredFields(
-      ['email', 'plaintextPassword'],
-      'To Add A User - Provide All Required Field: [\'email\',\'plaintextPassword\']'),
+      ['email', 'passwordPlainText'],
+      'To Add A User - Provide All Required Field: [\'email\',\'passwordPlainText\']'),
     acceptanceTokenSigShouldMatchInlineInfo
   )(e, c)
 }

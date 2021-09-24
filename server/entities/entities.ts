@@ -10,7 +10,6 @@ import { EntityAttributes } from 'dynamodb-toolbox/dist/classes/Entity'
 type Dict<T> = {[key:string]:T}
 export type IBucketTimeResolutions = 'Min'|'Tmb'|'Hr'|'Day'|'Month'|'Year' |'AllTime'
 
-
 export interface IQueryRangeReturn{
   Items: unknown[]
   Count: number
@@ -32,8 +31,6 @@ export interface ClickGet{
   short: string
   time: number
 }
-
-
 
 export interface ClickBucketByTimeGet{
   short:string
@@ -72,6 +69,7 @@ export interface UserKind {
 export const epoch = () => Date.now() //  epoch time in ms
 
 export const config = process.env.AWS_KEY
+  /* istanbul ignore next */
   ? {
       region: 'us-west-2',
       // endpoint: undefined,

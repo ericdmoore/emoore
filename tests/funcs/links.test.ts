@@ -6,7 +6,7 @@ import { nanoid } from 'nanoid'
 
 import { event, ctx } from '../gatewayData'
 import handler from '../../server/funcs/links'
-import { accessToken } from '../../server/auths/validJWT'
+import { accessToken } from '../../server/auths/tokens'
 import { appTable, user, link, userLookup, ILink, userAccess } from '../../server/entities'
 import { JSONparse as JSONParse } from '../../server/utils/jsonParse'
 
@@ -29,25 +29,25 @@ const preLoadUsers = [
     email: 'links.user1@example.com',
     uacct: nanoid(12),
     displayName: 'ItzaMe EricMario',
-    plaintextPassword: 'A not so very Bad password for Yoo'
+    passwordPlainText: 'A not so very Bad password for Yoo'
   },
   { // 1
     email: 'links.TimEst@example.com',
     uacct: nanoid(12),
     displayName: 'T.Est',
-    plaintextPassword: 'A not so very Bad password for Tim'
+    passwordPlainText: 'A not so very Bad password for Tim'
   },
   { // 2
     email: 'links.mdma@example.com',
     uacct: nanoid(12),
     displayName: 'Molly',
-    plaintextPassword: 'A not so very Bad password for Molly'
+    passwordPlainText: 'A not so very Bad password for Molly'
   },
   { // 3
     email: 'links.user2@example.com',
     uacct: nanoid(12),
     displayName: 'Bono of User2',
-    plaintextPassword: 'A not so very Bad password for Bono'
+    passwordPlainText: 'A not so very Bad password for Bono'
   }
 ]
 

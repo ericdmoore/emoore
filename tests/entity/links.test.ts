@@ -1,38 +1,38 @@
 /* globals test expect describe beforeAll afterAll */
 
-import { link, ILink} from '../../server/entities'
+import { link, ILink } from '../../server/entities'
 import { appTable } from '../../server/entities/entities'
+import { nanoid } from 'nanoid'
 
 // #region pure-tests
 test('User - DynDB Inputs', async () => {
-  const short = 'ex'
+  const short = nanoid()
   const long = 'https://example.com'
 
-  const l = await link.create({ short, long }) 
-  const t1 = await link.ent.put( l, { execute: false })
-  expect(t1.Item.pk).toBe(link.pk({ short }))
-  expect(t1.Item.sk).toBe(link.sk({ short }))
+  const l = await link.create({ short, long })
+  const l1 = await link.ent.put(l, { execute: false })
+  expect(l1.Item.pk).toBe(link.pk({ short }))
+  expect(l1.Item.sk).toBe(link.sk({ short }))
 
-  const t2 = await link.ent.get({ short }, { execute: false })
-  expect(t2.Key.pk).toBe(link.pk({ short }))
-  expect(t2.Key.sk).toBe(link.sk({ short }))
+  const l2 = await link.ent.get({ short }, { execute: false })
+  expect(l2.Key.pk).toBe(link.pk({ short }))
+  expect(l2.Key.sk).toBe(link.sk({ short }))
 })
 // #endregion pure-tests
 
 const linkDefs = [
-      { short: 'ex', long: 'https://example1.com' },
-      { short: 'example', long: 'https://example2.com' },
-      { short: 'short', long: 'https://long-link-example.com' },
-      { long: 'https://long-link-example.com'}
+  { short: 'vanity', long: 'https://example1.com' },
+  { short: nanoid(), long: 'https://example2.com' },
+  { short: nanoid(), long: 'https://long-link-example.com' },
+  { long: 'https://long-link-example.com' }
 ]
-const _links:ILink[] = []
+let _links:ILink[] = []
 
 describe('Using a Test Harness', () => {
   beforeAll(async () => {
     // const links = await lanks
-    const resLIst = await link.batch.put(...linkDefs)
-    resLIst.forEach(l=>_links.push(l))
-    
+    _links = await link.batch.put(...linkDefs)
+
     // console.log('scan: ',  await appTable.scan() )
     // console.log('now batch get: ', await link.batch.get(links))
     // console.log('now query: ', await appTable.query( link.pk(links[0]),{beginsWith: link.sk(links[0])} ) )
@@ -40,12 +40,13 @@ describe('Using a Test Harness', () => {
 
   afterAll(async () => {
     // const links = await lanks
-    await appTable.batchWrite(linkDefs.map(l => link.ent.deleteBatch(l)) )
+    await appTable.batchWrite(linkDefs.map(l => link.ent.deleteBatch(l)))
   })
 
-  test('Verifiy Test Harness via the Example Link Hokey Pokey', async ()=>{
-    const c = await link.batch.get([{short:'ex'}])
-    expect(c.filter(v=>v.long === linkDefs[0].long )).toHaveLength(1)
+  test('Verifiy Test Harness via the Example Link Hokey Pokey', async () => {
+    const { short, long } = linkDefs[0]
+    const c = await link.batch.get([{ short: short as string }])
+    expect(c.filter(v => v.long === long)).toHaveLength(1)
   })
 
   test('Get via Short Code', async () => {
@@ -64,14 +65,14 @@ describe('Using a Test Harness', () => {
 
   test('Already Used Vanity URL Test', async () => {
     const l = await link.create({
-      short:'ex', 
-      long:'https://exmaple-of-unavailable-vainity.com'
+      short: 'vanity',
+      long: 'https://exmaple-of-unavailable-vainity.com'
     })
 
     await link.ent.put(l)
-    const l2 = await link.get({short: l.short})
+    const l2 = await link.get({ short: l.short })
 
-    expect(l2.short).not.toEqual('ex')
+    expect(l2.short).not.toEqual('vanity')
     expect(l2).toHaveProperty('short')
     expect(l2).toHaveProperty('long')
     expect(l2).toHaveProperty('cts')
@@ -81,33 +82,38 @@ describe('Using a Test Harness', () => {
   })
 
   test('Make a Dynamic URL', async () => {
-    const {rotates, geos, hurdles, keepalive} = link.dynamicConfig
+    const { rotates, geos, hurdles, keepalive } = link.dynamicConfig
 
     const almostWinner:string = 'https://almostwinner.raffle.com'
     const youWin:string = 'https://youwin.raffle.com'
 
     const USraffleAutoClose = keepalive([
-      { at:10000, url: hurdles([
-          { at:10_000, url: almostWinner},
-          { at:12_000, url: youWin},
+      {
+        at: 10000,
+        url: hurdles([
+          { at: 10_000, url: almostWinner },
+          { at: 12_000, url: youWin }
         ])
       }
     ])
 
     const CANraffle = hurdles([
-      { at:10_000, url: 'https://almostCanada.raffle.com'},
-      { at:12_000, url: 'https://winnerCanada.raffle.com'},
+      { at: 10_000, url: 'https://almostCanada.raffle.com' },
+      { at: 12_000, url: 'https://winnerCanada.raffle.com' }
     ])
 
     const linky = await link.create({
-      short:'ex2', 
-      long:'https://root-level-url-exmaple.com',
+      short: 'ex2',
+      long: 'https://root-level-url-exmaple.com',
+      ownerUacct: 'Yoo Sir',
       dynamicConfig: geos([
-        { at:'US', url: USraffleAutoClose},
-        { at:'CAN', url: CANraffle},
-        { at:'_', url: rotates([
-          {at:1, url: USraffleAutoClose},
-          {at:1, url: CANraffle}])
+        { at: 'US', url: USraffleAutoClose },
+        { at: 'CAN', url: CANraffle },
+        {
+          at: '_',
+          url: rotates([
+            { at: 1, url: USraffleAutoClose },
+            { at: 1, url: CANraffle }])
         }
       ])
     })
@@ -115,7 +121,7 @@ describe('Using a Test Harness', () => {
     // console.log(linky)
 
     await link.ent.put(linky)
-    const l = await link.get({short: linky.short})
+    const l = await link.get({ short: linky.short })
 
     expect(l.short).not.toEqual('ex') // since it already exists
     expect(l).toHaveProperty('short')
@@ -126,5 +132,4 @@ describe('Using a Test Harness', () => {
     expect(l).toHaveProperty('ownerUacct')
     expect(l).toHaveProperty('dynamicConfig')
   })
-
 })

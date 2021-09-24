@@ -1,8 +1,9 @@
 /* globals test expect describe beforeAll afterAll */
-import { user } from '../../server/entities'
-import { appTable } from '../../server/entities/entities'
+import { user, UseBase } from '../../server/entities'
+// import { appTable } from '../../server/entities/entities'
 import { authenticator } from 'otplib'
 import bcrypt from 'bcryptjs'
+import { nanoid } from 'nanoid'
 
 // #region interfaces
 
@@ -12,20 +13,21 @@ interface DynamoDBGetInputs{
     Key: Dict<string>
 }
 
-interface oobToken{
-  strategy:string
-  uri:string
-  secret:string | Buffer
-  label?:string
-}
-interface User{
-    uacct: string
-    displayName: string
-    passwordPlainText: string
-    backupCodes: string[]
-    oobTokens: oobToken[]
-}
-type UserList = User[]
+// interface oobToken{
+//   strategy:string
+//   uri:string
+//   secret:string | Buffer
+//   label?:string
+// }
+
+// interface User{
+//     uacct: string
+//     displayName: string
+//     passwordPlainText: string
+//     backupCodes: string[]
+//     oobTokens: oobToken[]
+// }
+// type UserList = User[]
 
 // #endregion interfaces
 
@@ -117,84 +119,34 @@ test('User - password Hash', async () => {
 describe('Using a Test Harness', () => {
   const userList = [
     {
-      uacct: 'LJJW2SCONZTEEQ32JZAU64KC',
+      uacct: nanoid(),
       displayName: 'Yoo Sir',
       passwordPlainText: 'myPassword1',
-      backupCodes: [] as string[],
-      oobTokens: [] as oobToken[]
+      email: 'user.user@example.com',
+      oobTokens: [{ secret: 'DEADBEEF1', strategy: 'TOTP', uri: '', label: 'myLabelYS' }],
+      backupCodes: ['ys1', 'ys2', 'ys3', 'ys4', 'ys5']
     },
     {
-      uacct: 'CK46UAZJ23QEETZNOCS2WJJL',
+      uacct: nanoid(),
       displayName: 'Timothy',
       passwordPlainText: 'myPassword2',
-      backupCodes: [] as string[],
-      oobTokens: [] as oobToken[]
+      email: 'user.tim.test@example.com',
+      oobTokens: [{ secret: 'DEADBEEF2', strategy: 'TOTP', uri: '', label: 'myLabelTim' }],
+      backupCodes: ['', '', '', '', '']
     }
-  ]
-
-  interface IDRefs{
-    uacct: string
-    typeID: 'email'| 'phone'
-    exID: string
-  }
-
-  const userIDs = [
-    {
-      uacct: 'LJJW2SCONZTEEQ32JZAU64KC',
-      typeID: 'email' as 'email'| 'phone',
-      exID: 'user.user@example.com'
-    },
-    {
-      uacct: 'CK46UAZJ23QEETZNOCS2WJJL',
-      typeID: 'email' as 'email'| 'phone',
-      exID: 'user.tim.test@example.com'
-    }
-  ]
-
-  const updateUserWith2FA = async (idx:number, userList: UserList) => {
-    userList[idx].backupCodes = await user.otp.genBackups(8, 12)
-    userList[idx].oobTokens = [await user.otp.gen2FA(userList[idx].uacct)]
-  }
-
-  const updateUserWithExternalID = async (idx:number, idList: IDRefs[]) => {
-    const { uacct, typeID, exID } = idList[idx]
-    await user.addExternalID(uacct, typeID, exID)
-    return { uacct, typeID, exID }
-  }
+  ] as UseBase[]
 
   beforeAll(async () => {
-    // edit userList
-    await Promise.all([
-      updateUserWith2FA(0, userList),
-      updateUserWith2FA(1, userList),
-      updateUserWithExternalID(0, userIDs),
-      updateUserWithExternalID(1, userIDs)
-    ])
-
-    // write it
-    await appTable.batchWrite(
-      await Promise.all(
-        userList.map(
-          async u => {
-            const { passwordPlainText, ...usr } = u
-            return user.ent.putBatch({
-              ...usr,
-              pwHash: await user.password.toHash(passwordPlainText)
-            })
-          })
-      )
-    )
+    await user.batch.put(...userList)
   })
 
   afterAll(async () => {
-    await appTable.batchWrite(
-      userList.map(u => user.ent.deleteBatch(u))
-    )
+    await user.batch.rm(...userList)
   })
 
   test('Get via Email', async () => {
     const { uacct } = userList[0]
-    const u = await user.getByID(uacct)
+    const u = await user.getByID(uacct as string)
 
     expect(u).toHaveProperty('backupCodes')
     expect(u).toHaveProperty('displayName')
@@ -204,20 +156,21 @@ describe('Using a Test Harness', () => {
   })
 
   test('User - Mint User ID w/ Collision', async () => {
-    const uacct = await user.mintUserID('LJJW2SCONZTEEQ32JZAU64KC')
-    expect(uacct).toHaveLength(30)
+    const { uacct } = userList[0]
+    const newuserAcct = await user.mintUserID(uacct)
+    expect(newuserAcct).toHaveLength(27)
   })
 
-  test('Is Password Valid for User', async () => {
-    const { typeID, exID } = userIDs[0]
-    const u = await user.lookupVia({ typeID, exID })
+  test('Can Lookup via Email', async () => {
+    const { email } = userList[0]
+    const u = await user.lookupVia({ typeID: 'email', exID: email })
     expect(u).toBeTruthy()
   })
 
   test('Is Password Valid for User', async () => {
     const { uacct, passwordPlainText } = userList[0]
     const isValid = await user.password.isValidForUser({
-      uacct,
+      uacct: uacct as string,
       passwordPlainText
     })
     expect(isValid).toBe(true)
@@ -226,7 +179,7 @@ describe('Using a Test Harness', () => {
   test('Is Password inValid for User', async () => {
     const { uacct } = userList[0]
     const isValid = await user.password.isValidForUser({
-      uacct,
+      uacct: uacct as string,
       passwordPlainText: 'BAD Password'
     })
     expect(isValid).toBe(false)
@@ -234,10 +187,10 @@ describe('Using a Test Harness', () => {
 
   test('User has valid TOTP', async () => {
     const { uacct } = userList[0]
-    const secret = userList[0].oobTokens[0].secret
+    const secret = userList?.[0]?.oobTokens?.[0]?.secret
     const newTOTP = authenticator.generate(secret as string)
     const isValid = await user.otp.isValidTOTP(
-      uacct,
+      uacct as string,
       newTOTP
     )
     expect(isValid).toBe(true)
@@ -246,17 +199,17 @@ describe('Using a Test Harness', () => {
   test('User has invalid TOTP', async () => {
     const { uacct } = userList[0]
     const isValid = await user.otp.isValidTOTP(
-      uacct,
+      uacct as string,
       authenticator.generate('ABCDEADBEEF'))
     expect(isValid).toBe(false)
   })
 
   test('User has valid BackUp Code', async () => {
     const { uacct } = userList[0]
-    const backupCode = userList[0].backupCodes[0]
+    const backupCode = userList[0].backupCodes?.[0]
     const isValid = await user.otp.isValidBackUpCode(
-      uacct,
-      backupCode
+      uacct as string,
+      backupCode as string
     )
     expect(isValid).toBe(true)
   })
@@ -264,7 +217,7 @@ describe('Using a Test Harness', () => {
   test('User has invalid BackUp Code', async () => {
     const { uacct } = userList[0]
     const isValid = await user.otp.isValidBackUpCode(
-      uacct,
+      uacct as string,
       'ABCDEADBEEF'
     )
     expect(isValid).toBe(false)
@@ -272,10 +225,10 @@ describe('Using a Test Harness', () => {
 
   test('User has valid OTP', async () => {
     const { uacct } = userList[0]
-    const backupCode = userList[0].backupCodes[0]
+    const backupCode = userList[0].backupCodes?.[0]
     const isValid = await user.otp.isValidOTP(
-      uacct,
-      backupCode
+      uacct as string,
+      backupCode as string
     )
     expect(isValid).toBe(true)
   })

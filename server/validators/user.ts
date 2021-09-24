@@ -26,7 +26,7 @@ export const pluckAcceptanceToken = (e:Evt) => pluckDataFor('acceptanceToken')(e
 export const pluckUserSetupInfo = (e:Evt) => {
   const auto = pluckDataFor('auto')(e, undefined)
   const email = pluckDataFor('email')(e, undefined)
-  const plaintextPassword = pluckDataFor('plaintextPassword')(e, undefined)
+  const passwordPlainText = pluckDataFor('passwordPlainText')(e, undefined)
   const displayName = pluckDataFor('displayName')(e, undefined)
   const uacct = pluckDataFor('uacct')(e, undefined)
 
@@ -35,13 +35,13 @@ export const pluckUserSetupInfo = (e:Evt) => {
     auto: auto === '1' || auto === 'true',
     email: email ? decodeURIComponent(email) : undefined,
     displayName: displayName ? decodeURIComponent(displayName) : undefined,
-    plaintextPassword: plaintextPassword ? btoa(plaintextPassword) : undefined
+    passwordPlainText: passwordPlainText ? btoa(passwordPlainText) : undefined
   }
 }
 
 export const pluckUpdateFields = (e:Evt) => {
   const email = pluckDataFor('newEmail')(e, undefined)
-  const plaintextPassword = pluckDataFor('newPlaintextPassword')(e, undefined)
+  const passwordPlainText = pluckDataFor('newPasswordPlainText')(e, undefined)
   const displayName = pluckDataFor('newDisplayName')(e, undefined)
   const refreshBackupCodes = !!pluckDataFor('refreshBackupCodes')(e, undefined)
   const addTOTP = pluckDataFor('addTOTP')(e, undefined) // label
@@ -50,7 +50,7 @@ export const pluckUpdateFields = (e:Evt) => {
   return {
     displayName: displayName ? decodeURIComponent(displayName) : undefined,
     email: email ? decodeURIComponent(email) : undefined,
-    plaintextPassword: plaintextPassword ? btoa(plaintextPassword) : undefined,
+    passwordPlainText: passwordPlainText ? btoa(passwordPlainText) : undefined,
     refreshBackupCodes,
     addTOTP,
     rmTOTP
@@ -72,7 +72,7 @@ export const reqHasUpdatableFields: ValidationTest<Partial<FlatPostUserInfo>> = 
     reason: 'Please provide a field(s) for updating',
     passed: Object.values(userUdpateFields).length > 0,
     InvalidDataLoc: `    
-    atob( [H>Q>C].newPlaintextPassword )
+    atob( [H>Q>C].newPasswordPlainText )
     urlEncoded( [H>Q>C].newEmail )
     urlEncoded( [H>Q>C].newDisplayName )
     [H>Q>C].addBackupCodes = 'true'  (or omit) 
@@ -122,11 +122,11 @@ export const acceptanceTokenSigShouldMatchInlineInfo: ValidationTest<FlatPostUse
   const passed = deepEq({
     uacct: obj.uacct,
     email: obj.email,
-    plaintextPassword: obj.plaintextPassword
+    passwordPlainText: obj.passwordPlainText
   }, {
     uacct: uInfo.uacct,
     email: uInfo.email,
-    plaintextPassword: uInfo.plaintextPassword
+    passwordPlainText: uInfo.passwordPlainText
   })
 
   // console.log({ obj, uInfo, passed })
