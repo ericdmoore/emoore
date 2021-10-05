@@ -43,9 +43,11 @@ geo?: ipInfo
 sk?: string
 }
 
-export type RemoveClickInputs = {short:string; sk:string} | {short:string; cts:number | Date}
+export type RemoveClickInputs =
+| {short: string; sk: string}
+| {short: string; cts: number | Date}
 
-type SKInputs = {cts: Datish }
+type SKInputs = { cts: Datish }
 
 type Dict<T> = {[key:string]:T}
 
@@ -96,7 +98,6 @@ export const click = {
   synth: async (i:ClickInputs | IClick) => {
     const g = i.geo ? i.geo : await geoip.lookup(i.ip)
     const geo: ipInfo | undefined = g!! ? g : undefined
-
     return {
       ...i,
       geo,
@@ -132,10 +133,15 @@ export const click = {
         const clickr = clickArr[0]
         // console.log({ clickr })
         let cts: number | undefined
+        /* istanbul ignore next */
         let sk: string | undefined
+        /* istanbul ignore next */
         if ('cts' in clickr) {
+          /* istanbul ignore next */
           const ctsD = clickr.cts
+          /* istanbul ignore next */
           cts = typeof ctsD === 'number' ? ctsD : ctsD.getTime()
+          /* istanbul ignore next */
           sk = undefined
         } else {
           cts = undefined

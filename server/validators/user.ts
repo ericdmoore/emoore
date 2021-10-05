@@ -60,8 +60,9 @@ export const pluckUpdateFields = (e:Evt) => {
 export const pluckDeleteFields = (e:Evt) => {
   const rmUacctID = pluckDataFor('rmUacct')(e, undefined) //  uacctID
   const rmDelegateToken = pluckDataFor('rmDelegationToken')(e, undefined) // delegateToken
-  const rmTOTPlabel = pluckDataFor('rmTOTP')(e, undefined) // TOTP-label
-  return { rmUacctID, rmDelegateToken, rmTOTPlabel }
+  const rmTOTPlabel = pluckDataFor('rmTOTPLabel')(e, undefined) // TOTP-label
+  const rmTOTPsecret = pluckDataFor('rmTOTPSecret')(e, undefined) // TOTP-label
+  return { rmUacctID, rmDelegateToken, rmTOTPlabel, rmTOTPsecret }
 }
 
 export const reqHasUpdatableFields: ValidationTest<Partial<FlatPostUserInfo>> = async (e) => {

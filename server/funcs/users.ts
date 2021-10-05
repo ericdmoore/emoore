@@ -84,15 +84,27 @@ const validatedGET: IFunc = async (e, c) => {
   )(e, c)
 }
 
-const rmoveOobToken = async (uacct: string| IUser, tokenLabel:string) => {
+const removeOobToken = async (uacct: string | IUser, token: {label:string} | {secret:string}) => {
   const u:IUser = typeof uacct === 'string' ? await user.getByID(uacct) : uacct
   const priorNumTokens = u.oobTokens.length
-  const rmTOTPoptionIdx = u.oobTokens.reduce((_, oob, i) => oob.userLabel === tokenLabel ? i : -1, -1)
-  if (rmTOTPoptionIdx !== -1) {
-    await user.ent.update({ uacct: u.uacct, oobTokens: { $remove: [rmTOTPoptionIdx] } })
-    return { u, tokenCount: priorNumTokens - 1 }
+  if ('label' in token) {
+    // label mode
+    const rmTOTPoptionIdx = u.oobTokens.find((oob, i) => oob.userLabel === token.label)
+    if (rmTOTPoptionIdx) {
+      await user.ent.update({ uacct: u.uacct, oobTokens: { $remove: [rmTOTPoptionIdx] } })
+      return { u, tokenCount: priorNumTokens - 1 }
+    } else {
+      return { u, tokenCount: priorNumTokens }
+    }
   } else {
-    return { u, tokenCount: priorNumTokens }
+    // secret mode
+    const rmTOTPoptionIdx = u.oobTokens.find((oob, i) => oob.secret === token.secret)
+    if (rmTOTPoptionIdx) {
+      await user.ent.update({ uacct: u.uacct, oobTokens: { $remove: [rmTOTPoptionIdx] } })
+      return { u, tokenCount: priorNumTokens - 1 }
+    } else {
+      return { u, tokenCount: priorNumTokens }
+    }
   }
 }
 
@@ -203,7 +215,10 @@ const deleResponder: Responder<{}> = async (d, e, c, sidecars) => {
   const removed = {} as {[str:string]:unknown }
 
   if (deleInfo.rmTOTPlabel) {
-    const { tokenCount } = await rmoveOobToken(u.uacct, deleInfo.rmTOTPlabel)
+    const { tokenCount } = await removeOobToken(u.uacct,
+      'rmTOTPlabel' in deleInfo
+        ? { label: deleInfo.rmTOTPlabel as string }
+        : { secret: deleInfo.rmTOTPsecret as string })
     removed.oobToken = { tokenCount }
   }
   if (deleInfo.rmUacctID) {

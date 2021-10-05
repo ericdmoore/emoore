@@ -96,7 +96,7 @@ describe('POST /users', () => {
       }
     }
 
-    console.log({ e })
+    // console.log({ e })
     const resp = await handler(e, ctx) as SRet
     // console.log({ resp })
 
@@ -413,11 +413,12 @@ describe('Removing user attributes /users', () => {
     const authToken = (await accessToken().create({ uacct: uacct as string, email, last25: [] })).token
 
     const uBefore = await user.getByID(uacct as string)
-    e.headers = { authToken, addTOTP: 'Push/Pop_label' }
+    const label = 'Push/Pop_label'
+    e.headers = { authToken, addTOTP: label }
     await handler(e, ctx) as SRet
     const uMiddle = await user.getByID(uacct as string)
 
-    e.headers = { authToken, rmTOTP: 'Push/Pop_label' }
+    e.headers = { authToken, rmTOTP: label }
     const respRm = await handler(e, ctx) as SRet
     const uAfter = await user.getByID(uacct as string)
 

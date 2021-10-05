@@ -26,6 +26,19 @@ export interface IAccessTokenData extends JWTelementsExtras{
     last25: string[]
 }
 
+interface ThisScope{
+  a:1
+}
+interface ThatScope{
+  b:2
+}
+
+type Scope =
+| ThisScope
+| ThatScope
+
+export type IScopedAccessTokenData = JWTelementsExtras & IAccessTokenData & {scopes: Scope[]}
+
 export interface IAcceptanceTokenData extends JWTelementsExtras{
     email: string
     displayName: string
@@ -50,14 +63,14 @@ interface TypedVerifiedToken<T> {
 const FILEPATH = resolve(__dirname, '../../cloud/.env')
 const envConfig = dotenv.config({ path: FILEPATH }).parsed
 
-export const JWT_SECRET = process.env.JWT_SECRET ?? envConfig?.JWT_SECRET as string
-export const JWT_SECRET_ID = process.env.JWT_SECRET_ID ?? envConfig?.JWT_SECRET_ID as string
-export const ISSUER = 'co.federa'
+const JWT_SECRET = process.env.JWT_SECRET ?? envConfig?.JWT_SECRET as string
+const JWT_SECRET_ID = process.env.JWT_SECRET_ID ?? envConfig?.JWT_SECRET_ID as string
+const ISSUER = 'co.federa'
 
 // console.log({ envConfig })
 // console.log(`${ISSUER}--${JWT_SECRET_ID}--${JWT_SECRET}//`)
 
-export const jwtVerify = <OutputType extends JWTelementsExtras>(secretOrPublicKey: jwt.Secret | jwt.GetPublicKeyOrSecret = JWT_SECRET) =>
+const jwtVerify = <OutputType extends JWTelementsExtras>(secretOrPublicKey: jwt.Secret | jwt.GetPublicKeyOrSecret = JWT_SECRET) =>
   (token: string | undefined, opts?: jwt.VerifyOptions) : Promise<OutputType> =>
     new Promise((resolve, reject) => {
       if (!token) {
@@ -71,7 +84,7 @@ export const jwtVerify = <OutputType extends JWTelementsExtras>(secretOrPublicKe
       }
     })
 
-export const jwtSign = <InputType extends object>(secretOrPrivateKey: jwt.Secret = JWT_SECRET) =>
+const jwtSign = <InputType extends object>(secretOrPrivateKey: jwt.Secret = JWT_SECRET) =>
   (payload: InputType, opts?: jwt.SignOptions): Promise<string> =>
     new Promise((resolve, reject) => {
       const defaultOpts:jwt.SignOptions = { issuer: ISSUER, expiresIn: 3600 * 24, keyid: JWT_SECRET_ID }
@@ -79,6 +92,19 @@ export const jwtSign = <InputType extends object>(secretOrPrivateKey: jwt.Secret
         if (er) { reject(er) } else { resolve(obj as string) }
       })
     })
+
+// export const scopedAccessToken = (jwtSecret = JWT_SECRET) : ITokenStart<IScopedAccessTokenData> => {
+//   const create = async (obj:IScopedAccessTokenData) => {
+//     return { token: '', obj, headers: {} }
+//   }
+//   const fromString = async (s:string) => {
+//     return { token: s, obj: {} as IScopedAccessTokenData, headers: {} }
+//   }
+//   const isVerified = async () => {
+//     return false
+//   }
+//   return { create, fromString, isVerified }
+// }
 
 export const accessToken = (jwtSecret = JWT_SECRET) :ITokenStart<IAccessTokenData> => {
   const create = async (obj:IAccessTokenData, opts?:jwt.SignOptions) => {
