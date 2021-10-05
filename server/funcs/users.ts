@@ -215,10 +215,11 @@ const deleResponder: Responder<{}> = async (d, e, c, sidecars) => {
   const removed = {} as {[str:string]:unknown }
 
   if (deleInfo.rmTOTPlabel) {
-    const { tokenCount } = await removeOobToken(u.uacct,
-      'rmTOTPlabel' in deleInfo
-        ? { label: deleInfo.rmTOTPlabel as string }
-        : { secret: deleInfo.rmTOTPsecret as string })
+    const { tokenCount } = await removeOobToken(u.uacct, { label: deleInfo.rmTOTPlabel })
+    removed.oobToken = { tokenCount }
+  }
+  if (deleInfo.rmTOTPsecret) {
+    const { tokenCount } = await removeOobToken(u.uacct, { secret: deleInfo.rmTOTPsecret })
     removed.oobToken = { tokenCount }
   }
   if (deleInfo.rmUacctID) {
