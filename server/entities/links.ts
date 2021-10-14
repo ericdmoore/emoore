@@ -130,7 +130,7 @@ export const link = {
       const batchGet = await appTable.batchGet(
         shorts.map(l => link.ent.getBatch(l))
       ) as DocumentClient.BatchGetItemOutput
-      return Object.values(batchGet.Responses ?? {}).flat(1) as ILink[]
+      return Object.values(batchGet.Responses ?? [[]]).flat(1) as ILink[]
     },
     put: async (...links:(ILink| BatchCreateElem)[]) => {
       const listOLinks = await Promise.all(links.map(l => link.create(l)))

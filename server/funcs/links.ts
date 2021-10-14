@@ -84,7 +84,9 @@ export const validedGET:IFunc = async (event, ctx) => {
 export const getResponder: Responder<{short:string}[]> = async (dataPayload, e, c, extras) => {
   if (dataPayload.length === 0) {
     // query mode
-    const { uacct } = (await accessToken().fromString(pluckDataFor('authToken')(e, 'alreadyEnsured'))).obj
+    const { uacct } = (await accessToken().fromString(
+      pluckDataFor('authToken')(e, 'alreadyEnsured')
+    )).obj
 
     const resp = await userAccess.query.byUacct({ uacct })
     const list = resp.Items ?? []

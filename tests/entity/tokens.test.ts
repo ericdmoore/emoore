@@ -12,16 +12,18 @@ describe('Access Tokens', () => {
     expect(obj).toEqual(data)
   })
 
-  // test('Basic Create Access Token ', async () => {
-  //   const { token } = await accessToken().create({ uacct: '123', email: 'ex@example.com', last25: [] })
-  //   const shouldVerify = await accessToken().isVerified(token)
+  test('Verify an Invalid Access Token ', async () => {
+    const { token } = await accessToken().create({ uacct: '123', email: 'ex@example.com', last25: [] })
+    const shouldVerify = await accessToken().isVerified(token)
 
-  //   expect(shouldVerify).toBeTruthy()
-  //   await expect(
-  //     accessToken().isVerified(token + '1234')
-  //       .catch(er => { console.error(er); return null })
-  //   ).rejects
-  // })
+    expect(shouldVerify).toBeTruthy()
+
+    await expect(
+      accessToken().isVerified(token + '1234')
+    ).rejects.toEqual(
+      Error('Access Token Could Not Be Verfied')
+    )
+  })
 })
 
 describe('Acceptance Tokens', () => {
@@ -35,14 +37,19 @@ describe('Acceptance Tokens', () => {
     expect(obj).toEqual(data)
   })
 
-  // test('Invalid AcceptanceTokens ', async () => {
-  //   const { token } = await acceptanceToken().create({ displayName: 'Eric', email: 'ex@example.com', passwordPlainText: 'password' })
-  //   const shouldVerify = await acceptanceToken().isVerified(token)
+  test('Invalid AcceptanceToken', async () => {
+    const { token } = await acceptanceToken().create({
+      displayName: 'Eric',
+      email: 'ex@example.com',
+      passwordPlainText: 'password'
+    })
+    const shouldVerify = await acceptanceToken().isVerified(token)
+    expect(shouldVerify).toBeTruthy()
 
-  //   expect(shouldVerify).toBeTruthy()
-  //   await expect(
-  //     acceptanceToken().isVerified(token + '1234')
-  //       .catch(er => { console.error(er); return null })
-  //   ).rejects
-  // })
+    await expect(
+      acceptanceToken().isVerified(token + '1234')
+    ).rejects.toEqual(
+      Error('Access Token Could Not Be Verfied')
+    )
+  })
 })

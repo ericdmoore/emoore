@@ -1,6 +1,7 @@
-/* globals test describe test expect  */
-import { userAccess } from '../../server/entities/userAccess'
+/* globals test describe expect */
+
 import type { IUserAccess } from '../../server/entities/userAccess'
+import { userAccess } from '../../server/entities/userAccess'
 
 describe('User Access Entity', () => {
   test('User Access Get Params', async () => {
@@ -23,7 +24,7 @@ describe('User Access Entity', () => {
 
   test('Extra Params Throw Errors', () => {
     try {
-      const putParam = userAccess.batch.params.put({
+      userAccess.batch.params.put({
         long: 'http://long.com',
         short: 'l',
         uacct: 'uacct',

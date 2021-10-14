@@ -126,26 +126,28 @@ export const accessToken = (jwtSecret = JWT_SECRET) :ITokenStart<IAccessTokenDat
       jti, // JWT ID
       ...objData
     } = tokObj.payload
-
-    // console.log({tokObj})
     return Object.freeze({ token, obj: objData, headers: { alg, typ, kid, iat, exp, iss, sub, aud, nbf, jti } as JWTelementsExtras })
   }
+
   const fromString = async (token:string) => {
-    const tokObj = await jwtVerify(jwtSecret)(token)
-      .catch(er => { throw Error('Access Token Could Not Be Verfied') }) as unknown as TypedVerifiedToken<IAccessTokenData>
-
-    // pluck out
-    const { iat, exp, iss, ...objData } = tokObj.payload
-
-    return !objData?.uacct
-      ? Promise.reject(Error('AccessToken does not have a UACCT'))
-      : create(objData)
+    const tokObj = await jwtVerify(jwtSecret)(token).catch(() => null) as TypedVerifiedToken<IAccessTokenData> | null
+    if (tokObj === null) {
+      return Promise.reject(Error('Access Token Could Not Be Verfied'))
+    } else {
+      const { iat, exp, iss, ...objData } = tokObj.payload
+      return create(objData)
+    }
   }
   const isVerified = async (tokenStr:string, match:{iss:string, useDate: number} = { iss: ISSUER, useDate: Date.now() }) => {
-    const tokObj = await jwtVerify<IAccessTokenData>()(tokenStr)
-      .catch(er => { throw Error('Access Token Could Not Be Verfied') }) as unknown as TypedVerifiedToken<IAccessTokenData>
-    const { iss, iat, exp, ...obj } = tokObj.payload
-    return !!obj && iss === match.iss
+    const tokObj = await jwtVerify<IAccessTokenData>(jwtSecret)(tokenStr)
+      .catch(() => null) as TypedVerifiedToken<IAccessTokenData> | null
+
+    if (tokObj === null) {
+      return Promise.reject(Error('Access Token Could Not Be Verfied'))
+    } else {
+      const { iss, iat, exp, ...obj } = tokObj.payload
+      return !!obj && iss === match.iss
+    }
   }
   return { create, isVerified, fromString }
 }
@@ -164,18 +166,21 @@ export const acceptanceToken = (jwtSecret = JWT_SECRET) :ITokenStart<IAcceptance
       headers: { alg, typ, kid, iat, exp, iss, sub, aud, nbf, jti } as JWTelementsExtras
     })
   }
+
   const isVerified = async (tokenStr:string, match:{iss:string, useDate: number} = { iss: ISSUER, useDate: Date.now() }) => {
-    const tokObj = await jwtVerify(jwtSecret)(tokenStr)
-      .catch(er => { Promise.reject(Error('Access Token Could Not Be Verfied')) }) as unknown as TypedVerifiedToken<IAcceptanceTokenData>
-    const { iss, iat, exp, ...obj } = tokObj.payload
-    return !!obj && iss === match.iss
+    const tokObj = await jwtVerify(jwtSecret)(tokenStr).catch(() => null) as TypedVerifiedToken<IAcceptanceTokenData>
+    if (tokObj === null) {
+      return Promise.reject(Error('Access Token Could Not Be Verfied'))
+    } else {
+      const { iss, iat, exp, ...obj } = tokObj.payload
+      return !!obj && iss === match.iss
+    }
   }
 
   const fromString = async (token:string) => {
     const tokObj = await jwtVerify<IAcceptanceTokenData>(jwtSecret)(token).catch(er => null) as TypedVerifiedToken<IAcceptanceTokenData> | null
 
     if (tokObj) {
-      // pluck out
       const { iat, exp, iss, ...objData } = tokObj.payload
       return ['email', 'displayName', 'passwordPlainText'].every(key => key in objData)
         ? create(objData)

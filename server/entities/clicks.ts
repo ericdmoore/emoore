@@ -167,7 +167,11 @@ export const click = {
     },
     rmPrep: (clickArr: RemoveClickInputs[]) => {
       return clickArr.map(c => {
-        const cts = 'cts' in c ? typeof c.cts === 'number' ? c.cts : c.cts.getTime() : undefined
+        const cts = 'cts' in c
+          ? typeof c.cts === 'number'
+            ? c.cts
+            : c.cts.getTime()
+          : undefined
         const sk = 'sk' in c ? c.sk : undefined
         return click.ent.deleteBatch({ cts, sk, short: c.short })
       })
@@ -217,8 +221,6 @@ export const click = {
     },
     byWeeks: async (i:iClickEventByTimeDuration) => {
       const stop = i.stop ?? Date.now()
-
-      // console.log({start, stop}, 'week:windowSize:', stop - start)
 
       return click.query.usingRange({
         short: i.short,
