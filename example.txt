@@ -1,3 +1,0 @@
-[default]
-aws_access_key_id=xterm-256color
-aws_secret_access_key=xterm-256color

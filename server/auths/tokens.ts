@@ -23,7 +23,7 @@ interface ITokenStart<T> {
 export interface IAccessTokenData extends JWTelementsExtras{
     uacct: string
     email: string
-    last25: string[]
+    last25?: string[]
 }
 
 interface ThisScope{
@@ -126,7 +126,17 @@ export const accessToken = (jwtSecret = JWT_SECRET) :ITokenStart<IAccessTokenDat
       jti, // JWT ID
       ...objData
     } = tokObj.payload
-    return Object.freeze({ token, obj: objData, headers: { alg, typ, kid, iat, exp, iss, sub, aud, nbf, jti } as JWTelementsExtras })
+
+    const ret = Object.freeze({
+      token,
+      obj: {
+        ...objData,
+        last25: objData.last25 ?? []
+      },
+      headers: { alg, typ, kid, iat, exp, iss, sub, aud, nbf, jti } as JWTelementsExtras
+    })
+    // console.log({ createRetObj: ret.obj })
+    return ret
   }
 
   const fromString = async (token:string) => {
@@ -135,13 +145,13 @@ export const accessToken = (jwtSecret = JWT_SECRET) :ITokenStart<IAccessTokenDat
       return Promise.reject(Error('Access Token Could Not Be Verfied'))
     } else {
       const { iat, exp, iss, ...objData } = tokObj.payload
+      // console.log({ tokObjFromStr: tokObj })
       return create(objData)
     }
   }
   const isVerified = async (tokenStr:string, match:{iss:string, useDate: number} = { iss: ISSUER, useDate: Date.now() }) => {
     const tokObj = await jwtVerify<IAccessTokenData>(jwtSecret)(tokenStr)
       .catch(() => null) as TypedVerifiedToken<IAccessTokenData> | null
-
     if (tokObj === null) {
       return Promise.reject(Error('Access Token Could Not Be Verfied'))
     } else {

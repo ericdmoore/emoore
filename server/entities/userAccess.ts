@@ -19,8 +19,8 @@ export const userAccess = {
     }
   },
   query: {
-    byUacct: (i:{uacct: string }) => appTable.query(userAccess.pk(i), { beginsWith: 'ac#' }) as Promise<DocumentClient.QueryOutput>,
-    byUacctDates: (i:{uacct: string, start:number, end:number }) => { throw Error('Not Implemented Yet') }
+    byUacct: (i:{uacct: string }) => appTable.query(userAccess.pk(i), { beginsWith: 'ac#' }) as Promise<DocumentClient.QueryOutput>
+    // byUacctDates: (i:{uacct: string, start:number, end:number }) => { throw Error('Not Implemented Yet') }
   },
   ent: new Entity({
     table: appTable,

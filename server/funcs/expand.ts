@@ -295,7 +295,7 @@ const collapseKeepalive = (link:Readonly<ILink>,
   event:Readonly<ExpandLinkEvent>,
   history: Readonly<ExpandLinkHistory>
 ):string => {
-  const clickDist = Date.now() - history.lastClick
+  const clickDistance = Date.now() - history.lastClick
 
   // dist = 9
   // [{at: 10}, {at: 100}, {at: 1000}]
@@ -322,7 +322,7 @@ const collapseKeepalive = (link:Readonly<ILink>,
   //
   // elapsedTimes: 3d, 10d, 20d, 90d,
   //
-  console.error(clickDist, 'not implemented yet')
+  console.error({ clickDistance }, 'not implemented yet')
   return link.long
 
   // not kept alive???

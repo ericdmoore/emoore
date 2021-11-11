@@ -1,7 +1,7 @@
 /* globals describe test expect  beforeAll afterAll */
 // beforeEach afterEach
 import type { Evt, SRet } from '../../server/types'
-import type { UseBase } from '../../server/entities/users'
+// import type { UserBase } from '../../server/entities/users'
 
 import handler from '../../server/funcs/users'
 import { user } from '../../server/entities'
@@ -16,13 +16,6 @@ import { JSONparse } from '../../server/utils/jsonParse'
 
 const openBrotliP = promisify(brotliDecompress)
 
-// interface IUserInfo extends JWTelementsOptionInputs{
-//   email:string
-//   displayName:string
-//   plaintextPassword: string
-//   uacct?: string
-// }
-
 // type IUerInfoOutputs = IUserInfo & JWTelementsExtras
 
 export const userList = [
@@ -30,28 +23,28 @@ export const userList = [
     email: 'users.user1@example.com',
     uacct: nanoid(12),
     displayName: 'Yoo Sir',
-    passwordPlainText: 'A not so very Bad password for Yoo'
+    passwordPlainText: 'A not so very Bad password for Yoo',
+    backupCodes: ['0ABC123', '0ABC124']
   },
   {
     email: 'users.TimEst@example.com',
     uacct: nanoid(12),
     displayName: 'T Est',
-    passwordPlainText: 'A not so very Bad password for Tim'
+    passwordPlainText: 'A not so very Bad password for Tim',
+    backupCodes: ['1ABC123', '1ABC124']
   },
   {
     email: 'users.mdma@example.com',
     uacct: nanoid(12),
     displayName: 'Molly',
-    passwordPlainText: 'A not so very Bad password for Molly'
+    passwordPlainText: 'A not so very Bad password for Molly',
+    backupCodes: ['2ABC123', '2ABC124']
   }
-] as UseBase[]
-
-// const signAcceptanceToken = jwtSign<IUserInfo>()
-// const signAuthToken = jwtSign<JWTObjectInput>()
-// const verifyToken = jwtVerify<IUerInfoOutputs>()
+]
 
 beforeAll(async () => {
   await user.batch.put(...userList)
+  //  const r = // console.log({ r })
 })
 
 afterAll(async () => {
@@ -87,12 +80,14 @@ describe('POST /users', () => {
       displayName: 'Exampler Man',
       passwordPlainText: 'A Very Plain Ol Password'
     }
-    const accToken = (await acceptanceToken().create(userInfo)).token
+
+    const { token } = await acceptanceToken().create(userInfo).catch(() => ({ token: undefined }))
+
     const e = {
       ...postEvent,
       queryStringParameters: {
         ...fmtUserInfo(userInfo),
-        acceptanceToken: accToken
+        acceptanceToken: token
       }
     }
 
@@ -102,8 +97,14 @@ describe('POST /users', () => {
 
     const { err, data } = JSONparse(resp?.body ?? 'null')
     const body = data
+
+    // console.log({ resp })
+
     expect(err).toBeFalsy()
     expect(body).toHaveProperty('user')
+
+    // console.log({ body, err })
+
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
   })
@@ -127,11 +128,15 @@ describe('POST /users', () => {
       passwordPlainText: ' This element is not included in the response so it does not make sense to make it terribly long'
     }
 
+    const { token } = await acceptanceToken()
+      .create(userInfo)
+      .catch(() => ({ token: undefined }))
+
     const e = {
       ...postEvent,
       headers: { 'Accept-Encoding': 'br' },
       queryStringParameters: {
-        acceptanceToken: (await acceptanceToken().create(userInfo)).token,
+        acceptanceToken: token,
         ...fmtUserInfo(userInfo)
       }
     }
@@ -146,9 +151,9 @@ describe('POST /users', () => {
 
     const uncBodyStr = uncBody.toString('utf-8')
     const { err, data } = JSONparse(uncBodyStr)
-    const body = data
 
-    // console.log({ body })
+    const body = data
+    // console.log({ err, body })
 
     expect(err).toBeFalsy()
     expect(resp.statusCode).toBe(200)
@@ -162,17 +167,17 @@ describe('POST /users', () => {
     const usr = userList[0]
     const userInfo = {
       email: usr.email,
-      displayName: usr.displayName,
+      displayName: usr.displayName as string,
       passwordPlainText: usr.passwordPlainText
     }
 
-    const accToken = (await acceptanceToken().create(userInfo)).token
+    const { token } = await acceptanceToken().create(userInfo)
 
     const e = {
       ...postEvent,
       queryStringParameters: {
         ...userInfo,
-        acceptanceToken: accToken,
+        acceptanceToken: token,
         email: encodeURIComponent(userInfo.email),
         passwordPlainText: atob(userInfo.passwordPlainText)
       }
@@ -192,18 +197,18 @@ describe('POST /users', () => {
     const usr = userList[0]
     const userInfo = {
       email: usr.email,
-      displayName: usr.displayName,
+      displayName: usr.displayName as string,
       passwordPlainText: usr.passwordPlainText
     }
 
-    const accToken = (await acceptanceToken().create(userInfo)).token
+    const { token } = await acceptanceToken().create(userInfo)
 
     const e = {
       ...postEvent,
       headers: { 'Accept-Encoding': 'br' },
       queryStringParameters: {
         ...userInfo,
-        acceptanceToken: accToken,
+        acceptanceToken: token,
         email: encodeURIComponent(userInfo.email),
         passwordPlainText: atob(userInfo.passwordPlainText)
       }
@@ -229,18 +234,21 @@ describe('POST /users', () => {
     const usr = userList[0]
     const userInfo = {
       email: usr.email,
-      displayName: usr.displayName,
+      displayName: usr.displayName as string,
       passwordPlainText: usr.passwordPlainText,
       auto: true
     }
     // const acceptanceToken = await signAcceptanceToken()
 
-    const accToken = (await acceptanceToken().create({ ...userInfo, uacct: '1234567890' })).token
+    const { token } = await acceptanceToken().create({
+      ...userInfo,
+      uacct: '1234567890'
+    })
 
     const e = {
       ...postEvent,
       queryStringParameters: {
-        acceptanceToken: accToken,
+        acceptanceToken: token,
         displayName: usr.displayName,
         email: encodeURIComponent(userInfo.email),
         passwordPlainText: atob(userInfo.passwordPlainText)
@@ -437,6 +445,37 @@ describe('Removing user attributes /users', () => {
     expect(uMiddle.oobTokens.length).toBeGreaterThan(uAfter.oobTokens.length)
     expect(uBefore.oobTokens.length).toBe(uAfter.oobTokens.length)
   })
+
   // test.todo('Revoke a delegation token for Yoo')
-  test.todo('Revoke a backup code when used')
+  test('Manual removal of backup code ', async () => {
+    const e = { ...event('DELETE', '/users') }
+    const { uacct, email, backupCodes } = userList[0] as {uacct: string, email: string, backupCodes: string[]}
+
+    console.log({ userInTest0: userList[0] })
+    const usr = await user.getByID(uacct)
+    console.log({ userInTest1: usr })
+
+    const { token } = await accessToken().create({ uacct: uacct as string, email, last25: [] })
+
+    e.headers = {
+      authToken: token,
+      rmBackupCode: backupCodes[0]
+    }
+
+    const resp = await handler(e, ctx) as SRet
+
+    expect(resp).toHaveProperty('body')
+    expect(resp).toHaveProperty('statusCode', 200)
+    expect(resp).toHaveProperty('isBase64Encoded', false)
+    expect(resp).toHaveProperty('cookies', [])
+
+    const respBody = JSON.parse(resp.body ?? 'null') as any
+
+    console.log({ resp })
+    console.log(JSON.stringify(respBody, null, 2))
+
+    expect(respBody).toHaveProperty('removed')
+    expect(respBody.removed).toHaveProperty('backupCode')
+    expect(respBody.removed.backupCode).toHaveProperty('nowBackupCodesLen')
+  })
 })

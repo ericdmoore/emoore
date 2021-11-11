@@ -45,15 +45,20 @@ export const pluckPaths = (whereToLook:string) => (e:Evt): unknown => {
   const paths = pluckDataFor(whereToLook)(e, '[]' as string)
 
   // console.log(JSONparse(paths))
-  return JSON5.parse(paths, function (_, val) {
-    return typeof val === 'string'
-      ? decodeURIComponent(val)
-      : val
-  })
+  try {
+    return JSON5.parse(paths, function (_, val) {
+      return typeof val === 'string'
+        ? decodeURIComponent(val)
+        : val
+    })
+  } catch (e) {
+    // console.info(e)
+    return null
+  }
 }
 
 const allHaveScheme = (urls:(string| CreateLinkInput)[]) => {
-  return urls.every((long) => {
+  return urls.length > 0 && urls.every((long) => {
     const l = typeof long === 'string' ? long : long.long
     return l.startsWith('http://') || l.startsWith('https://')
   })
@@ -99,8 +104,16 @@ export const linkBatchSize = (pathToCheck:'longpaths'|'shortpaths'): ValidationT
 }
 
 export const allLinksHaveAScheme = (pathToLook:'longpaths'): ValidationTest<unknown> => async (e, c, d) => {
-  const paths = (pluckPaths(pathToLook)(e) as (string | CreateLinkInput)[])
-    .map(long => typeof long === 'string' ? { long } : long)
+  let paths : CreateLinkInput[]
+
+  try {
+    paths = (
+      pluckPaths(pathToLook)(e) as (string | CreateLinkInput)[]
+    ).map(long => typeof long === 'string' ? { long } : long)
+  } catch (e) {
+    paths = []
+  }
+
   return {
     code: 400,
     reason: 'All links must have a schema/protocol',

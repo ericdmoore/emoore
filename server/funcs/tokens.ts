@@ -17,14 +17,14 @@ import {
   // pluckStarterTokenFromEvent,
   pluckAuthTokenFromEvent,
   emailAddressShouldBeValid,
-  emailShouldBeProvided,
+  // emailShouldBeProvided,
   // emailCredentialShouldMatchTheEmailInTheAuthToken,
   passShouldBeProvidedAndValid,
   authTokenShouldBeValid,
   authTokenShouldBeProvided,
   challengeTOTPShouldBeValid
 } from '../validators/tokens'
-
+import user from '../entities/users'
 import { jsonResp, respSelector, CORSHeaderEntries } from '../utils/SRetFormat'
 const compressableJson = respSelector(jsonResp)
 
@@ -34,7 +34,7 @@ export interface ILoginInfoInput{
     email: string | null
     p: string | null
     TFAchallengeResp: string
-    TFAtype: 'TOTP' | 'U2F' | string
+    TFAtype: 'TOTP' | 'U2F' | 'Backup' | string
 }
 
 export interface DelegationInput extends Required<ILoginInfoInput>{
@@ -82,6 +82,7 @@ export const validatedPOST:IFunc = async (e, c) => {
     postFinalTokenResponder,
     { ...credsInputs } as IAuthzFlat,
     async () => {
+      // has all of: email, p, TFAType, TFAchallengeResp
       return {
         code: 400,
         passed: hasAllCreds(credsInputs),
@@ -90,7 +91,7 @@ export const validatedPOST:IFunc = async (e, c) => {
         InvalidDataVal: JSON.stringify(credsInputs, null, 2)
       }
     },
-    emailShouldBeProvided,
+    // emailShouldBeProvided,
     emailAddressShouldBeValid('user'),
     passShouldBeProvidedAndValid,
     challengeTOTPShouldBeValid
@@ -98,39 +99,31 @@ export const validatedPOST:IFunc = async (e, c) => {
 }
 
 export const postFinalTokenResponder:Responder<unknown> = async (data, event, ctx, extras) => {
-  const paramUsr = extras.user as IUser
-  const { backupCodes, pwHash, oobTokens, cts, mts, entity, ...usr } = paramUsr
-  const authToken = (await accessToken().create({ email: usr.email, uacct: usr.uacct, last25: usr.last25 })).token
+  const { backupCodes, pwHash, oobTokens, cts, mts, entity, ...usr } = extras.user as IUser
+  // console.log({ funcUsr: extras.user })
 
-  // console.log({ usr, u: extras.user})
+  const credsInputs = pluckCredentialsFromEvent(event)
+  if (credsInputs.TFAtype === 'Backup') {
+    await user.otp.expireBackupCode(extras.user as IUser, credsInputs.TFAchallengeResp as string)
+  }
+
+  const { token } = await accessToken().create(usr)
 
   return {
     statusCode: 200,
     ...await compressableJson(
       {
         headers: CORSHeaderEntries,
-        cookies: [`authToken=${authToken}`]
+        cookies: [`authToken=${token}`]
       }
     )(event,
       {
-        authToken,
+        authToken: token,
         user: usr as IUserPublic
       }
     )
   }
 }
-
-// export const postStarterTokenResponder:Responder<IAuthzFlatRequired> = async (data, event, ctx) => {
-//   // console.log('postStarterTokenResponder', data)
-//   const { email, uacct } = data
-//   const starterToken = (await accessToken().create({ email, uacct, last25: []})).token
-//   return {
-//     statusCode: 200,
-//     isBase64Encoded: false,
-//     cookies: [`starterToken=${starterToken}`],
-//     body: JSON.stringify({ starterToken })
-//   } as SRet
-// }
 
 export const validatedGET:IFunc = async (e, c) => {
   const tokenStr = pluckAuthTokenFromEvent(e)
@@ -165,15 +158,15 @@ export const validatedGET:IFunc = async (e, c) => {
 
 export const getResponder:Responder<IAccessTokenData> = async (d, e, c) => {
   const { uacct, last25, email } = d
-  const nextAuthToken = (await accessToken().create({ uacct, email, last25 })).token
+  const { token } = await accessToken().create({ uacct, email, last25 })
 
   return {
     statusCode: 200,
     ...await compressableJson({
       headers: CORSHeaderEntries,
-      cookies: [`authToken=${nextAuthToken}`]
+      cookies: [`authToken=${token}`]
     })(e, {
-      refreshedAuthToken: nextAuthToken,
+      refreshedAuthToken: token,
       user: d,
       delegateStarterTokens: [], // I am a helper for these accounts, and they can revoke my access
       revocableDelegationStarterTokens: [] // I have these helpers for my account

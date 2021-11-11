@@ -1,4 +1,5 @@
 // import type * as k from '../types'
+import type { DocumentClient } from 'aws-sdk/clients/dynamodb'
 import { randomBytes } from 'crypto'
 import { Entity } from 'dynamodb-toolbox'
 import bcrypt from 'bcryptjs'
@@ -7,49 +8,53 @@ import { authenticator } from 'otplib'
 import { encode as encodeB32 } from 'hi-base32'
 import { appTable, customTimeStamps } from './entities'
 import { userLookup } from './userLookup'
+import { batch } from '../utils/ranges/batch'
 
 // import { Fido2Lib } from 'fido2-library'
 // import qrcode from 'qrcode'
 // can add this if browser side it too difficult
 
 // const h = require('fido2-helpers')
-
-interface TwoFAStringSec {
-   strategy: 'TOTP' | 'SMS'
-   secret: string
-   // acctName: string use-displayName
-   userLabel?: string
-}
-
 interface IOobTokenInput{
-  strategy:string
+  strategy: 'TOTP' | 'SMS' | 'U2F'
   uri:string
   secret:string
   label?:string
 }
 
-export interface UseBase{
-  email: string
-  displayName:string
-  passwordPlainText: string
-  uacct?: string
-  oobTokens?: IOobTokenInput[]
-  backupCodes?: string[]
+interface TwoFAStringSec {
+   strategy: 'TOTP' | 'SMS'
+   secret: string
+   uri: string
+   // acctName: string use-displayName
+   label?: string
 }
-
-// @ref overview:  https://developers.yubico.com/U2F/Protocol_details/Overview.html
-// @ref python implementation: https://github.com/Yubico/python-fido2/blob/master/examples/server/server.py
 
 interface TwoFAfido20 {
   strategy: 'U2F'
-  userLabel: string
   secret: string // semicolonX2 separated values - [secValue;; pubKey;; cert?]
+  uri: string
+  label?: string
+
   keyHandle: string // keyID aka key-handle in the USB
   pubKey: string | null
   cert: string | null
   counter?: number // RP verifies that the counter is hifgher than last time
 }
 type ITwoFactorOpt = TwoFAStringSec | TwoFAfido20
+
+export interface UserBase{
+  email: string
+  passwordPlainText: string
+  displayName?:string
+  uacct?: string
+  oobTokens?: IOobTokenInput[]
+  backupCodes?: string[]
+  last25?: string[]
+}
+
+// @ref overview:  https://developers.yubico.com/U2F/Protocol_details/Overview.html
+// @ref python implementation: https://github.com/Yubico/python-fido2/blob/master/examples/server/server.py
 
 export interface IUser{
   uacct: string
@@ -71,6 +76,12 @@ export interface IUser{
 const createRandomBytes = (bytes:number): Promise<Buffer> => new Promise((resolve, reject) => {
   randomBytes(bytes, (er, d) => er ? reject(er) : resolve(d))
 })
+
+const toOOBtokens = (uacct:string, i:IOobTokenInput[]): Promise<ITwoFactorOpt[]> => {
+  return Promise.all(
+    i.map(oob => user.otp.gen2FA(uacct, oob))
+  )
+}
 
 // const oneOf = async (...tests: (()=>Promise<boolean>)[]) => tests.reduce(
 // async (p, c) => await p || await c(), Promise.resolve(false))
@@ -141,13 +152,11 @@ export const user = {
    * @param uacct user account
    * @readsDB
    */
-  getByID: async (uacct:string):Promise<IUser> =>
-    user.ent.get({ uacct })
-      .then(d => d.Item)
-      .catch(er => {
-        /* istanbul ignore next */
-        throw new Error(er)
-      }),
+  getByID: async (uacct?:string):Promise<IUser> =>
+    !uacct
+      ? undefined
+      : user.ent.get({ uacct }, { consistent: true })
+        .then(d => d.Item),
   /**
    * @writesDB
    * @param email -
@@ -159,53 +168,96 @@ export const user = {
    * @param backupCodeInputs
    */
   genUser: async (
-    email: string,
-    passwordPlainText: string,
-    uacctInput?: string,
-    displayName?: string,
-    delegateToUaccts: string[] = [],
-    oobTokenInputs: { strategy:string, uri:string, secret:string, label?:string }[] = [],
-    backupCodeInputs: string[] = []
+    opts:{
+      email: string,
+      passwordPlainText: string,
+      uacct?: string,
+      displayName?: string,
+      oobTokens?: IOobTokenInput[],
+      backupCodes?: string[],
+      last25?:string[]
+    }
   ) => {
-    const uacct = await user.mintUserID(uacctInput)
-    const oobTokens = [...oobTokenInputs, await user.otp.gen2FA(uacct, 'TOTP')]
-    const backupCodes = [...backupCodeInputs, ...await user.otp.genBackups()]
-    const pwHash = await user.password.toHash(passwordPlainText)
-    const last25 = [] as string[]
+    const uacct = await user.mintUserID(opts?.uacct)
+    const pwHash = await user.password.toHash(opts.passwordPlainText)
+    const oobTokens:ITwoFactorOpt[] = [
+      ...await toOOBtokens(uacct, opts?.oobTokens ?? []),
+      await user.otp.gen2FA(uacct, { strategy: 'TOTP' })
+    ]
+    const backupCodes = [...opts?.backupCodes ?? [], ...await user.otp.genBackups()]
+    const last25 = [...opts?.last25 ?? []]
 
-    // delegation,
-    await user.ent.put({ uacct, email, displayName, oobTokens, backupCodes, pwHash, last25 })
-    await user.addExternalID(uacct, 'email', email)
+    // do delegation here?
+    // then save with set add externalID
+    //
+    // console.log({ uacct, email: opts.email, displayName: opts?.displayName, oobTokens, backupCodes, pwHash, last25})
 
     return {
       uacct,
-      email,
-      displayName,
+      email: opts.email,
+      displayName: opts?.displayName,
       oobTokens,
       backupCodes,
-      pwHash
-      // delegation
+      pwHash,
+      last25,
+      save: async () => {
+        await user.ent.put({ uacct, email: opts.email, displayName: opts?.displayName, oobTokens, backupCodes, pwHash, last25 })
+        await user.addExternalID(uacct, 'email', opts.email)
+      }
     }
   },
   batch: {
-    put: async (...userList:UseBase[]) => Promise.all(
-      userList.map(
-        u => user.genUser(
-          u.email,
-          u.passwordPlainText,
-          u.uacct,
-          u.displayName,
-          undefined,
-          u.oobTokens,
-          u.backupCodes
+    transact: async (items: DocumentClient.TransactWriteItemList,
+      opts : { ReturnConsumedCapacity?: string, ReturnItemCollectionMetrics?: string, ClientRequestToken?: string
+      } = { ReturnConsumedCapacity: 'TOTAL', ReturnItemCollectionMetrics: 'SIZE' }
+    ):Promise<DocumentClient.TransactWriteItemsOutput> => {
+      return new Promise((resolve, reject) => {
+        return user.ent.DocumentClient.transactWrite({ ...opts, TransactItems: items },
+          (err, data) => {
+            // retry logic goes here
+            err ? reject(err) : resolve(data)
+          }
         )
-      )
-    ),
-    rm: async (...userList:UseBase[]) => Promise.all([
+      })
+    },
+    /**
+     * @note max len = 12 items in array
+     */
+    put: async (...userList : UserBase[]) => {
+      const byTheDozens = batch(12)
+      // const acc = []
+      for (const dozenUsers of byTheDozens(userList)) {
+        await user.ent.table.batchWrite(
+          [
+            ...await Promise.all(
+              dozenUsers.map(async (u, i) => {
+                const { save, ...usr } = await user.genUser(u)
+                return user.ent.putBatch(usr)
+              })),
+            ...await Promise.all(
+              dozenUsers.map(async u =>
+                userLookup.ent.putBatch(
+                  {
+                    // because the user.addExternal already runs this side-effect
+                    uacct: u.uacct,
+                    exID: u.email,
+                    typeID: 'email',
+                    isIDVerified: false
+                  }
+                )
+              )
+            )
+          ]
+        )
+        // acc.push(r)
+      }
+      // return acc
+    },
+    rm: async (...userList:UserBase[]) => Promise.all([
       user.ent.table.batchWrite(userList.map(u => user.ent.deleteBatch(u))),
       user.ent.table.batchWrite(userList.map(u => userLookup.ent.deleteBatch({ exID: u.email, typeID: 'email' })))
     ]),
-    get: async (...userList:UseBase[]) => user.ent.table.batchGet(userList.map(u => user.ent.getBatch(u)))
+    get: async (...userList:UserBase[]) => user.ent.table.batchGet(userList.map(u => user.ent.getBatch(u)))
   },
   password: {
     /**
@@ -297,7 +349,7 @@ export const user = {
      * @pure
      */
     genBackups: async (backUpCodeLen: number = 8, codeLen = 12) => {
-      return Array(backUpCodeLen).fill(0).map(v => nanoid(codeLen))
+      return Array.from({ length: backUpCodeLen }, (v) => nanoid(codeLen))
     },
     /**
      * @param email
@@ -305,20 +357,42 @@ export const user = {
      * @pure
      * @note Please Save the secret
      */
-    gen2FA: async (uacct:string, strategy :'TOTP' | 'SMS' | 'U2F' = 'TOTP', userLabel?: string) => {
-      if (strategy === 'TOTP') {
-        const { secret } = await user.otp.createTOTPOption()
-        const uri = authenticator.keyuri(uacct, 'emoo.re', secret)
-        return { strategy, uri, secret, userLabel }
-      } else if (strategy === 'SMS') {
+    gen2FA: async (uacct:string, opts: {
+      strategy :'TOTP' | 'SMS' | 'U2F',
+      uri?:string,
+      secret?:string,
+      label?: string} =
+    { strategy: 'TOTP' }):Promise<ITwoFactorOpt> => {
+      if (opts.strategy === 'TOTP') {
+        const secret = opts.secret
+          ? opts.secret
+          : (await user.otp.createTOTPOption()).secret
+        return {
+          strategy: 'TOTP',
+          secret,
+          label: opts.label,
+          uri: opts.uri ?? authenticator.keyuri(uacct, 'emoo.re', secret)
+        }
+      } else if (opts.strategy === 'SMS') {
         const secret = encodeB32(nanoid(5)).slice(0, 6)
-        const jwt = `somejwt.including.${uacct}`
-        const uri = `https://login.emoo.re?authToken=${jwt}`
-        return { strategy, uri, secret, userLabel }
-      } else if (strategy === 'U2F') {
-        const secret = `${await createRandomBytes(32)};;` // secret;; puKey;; cert
-        const uri = 'https://emoore.re'
-        return { strategy, uri, secret, userLabel }
+        const jwt = `someJWT.withSecret${secret}and${uacct}.bakedin`
+        return {
+          strategy: 'SMS',
+          secret,
+          label: opts.label,
+          uri: `https://login.emoo.re?authToken=${jwt}`
+        }
+      } else if (opts.strategy === 'U2F') {
+        return {
+          strategy: 'U2F',
+          uri: 'https://emoore.re',
+          secret: `${await createRandomBytes(32)};;`, // secret;; puKey;; cert
+          label: opts.label,
+          keyHandle: 'keyID', // keyID aka key-handle in the USB
+          pubKey: 'RSA...',
+          cert: 'RSA...',
+          counter: 42
+        }
       } else {
         /* istanbul ignore next */
         throw new Error('Invalid strategy type')
@@ -330,7 +404,30 @@ export const user = {
     createTOTPOption: async () => ({
       strategy: 'TOTP',
       secret: authenticator.generateSecret()
-    })
+    }),
+    expireBackupCode: async (uacct: string | IUser, deleteMeCode: string) => {
+      const u :IUser = typeof uacct === 'string'
+        ? await user.getByID(uacct)
+        : uacct
+
+      const priorNumCodes = u.backupCodes?.length ?? []
+
+      // may not find it - since the secret value might be a TOTP - thus this call would be a no-op
+      const backUpCodeIdx = (u?.backupCodes ?? []).findIndex((backupcode, i) => backupcode === deleteMeCode)
+
+      // console.log({ backupCodes: u?.backupCodes ?? [], code: deleteMeCode, backUpCodeIdx})
+
+      if (backUpCodeIdx !== -1) {
+        const updateCmd = {
+          uacct: u.uacct,
+          backupCodes: { $remove: [backUpCodeIdx] }
+        }
+        await user.ent.update(updateCmd)
+        return { u, tokenCount: priorNumCodes - 1 }
+      } else {
+        return { u, tokenCount: priorNumCodes }
+      }
+    }
   },
   ent: new Entity({
     table: appTable,
@@ -345,10 +442,10 @@ export const user = {
       // groupMembership : { type: 'set', setType: 'string' }, // @see groupsHaveRolePrivelges
       // withRoles : { type: 'set', setType: 'string' }, // @see groupsHaveRolePrivelges
       displayName: { type: 'string' },
-      oobTokens: { type: 'list' }, // { strategy, uri, secret, label }[]
-      backupCodes: { type: 'set', setType: 'string' },
       pwHash: { type: 'string' },
-      last25: { type: 'list' },
+      oobTokens: { type: 'list' }, // { strategy, uri, secret, label }[]
+      backupCodes: { type: 'list', default: [] },
+      last25: { type: 'list', default: [] },
       pk: { hidden: true, partitionKey: true, dependsOn: 'uacct', default: (data:any) => user.pk(data) },
       sk: { hidden: true, sortKey: true, dependsOn: 'uacct', default: (data:any) => user.sk(data) }
     })

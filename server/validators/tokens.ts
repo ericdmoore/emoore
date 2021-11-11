@@ -167,11 +167,11 @@ export const authTokenShouldBeProvided: ValidationTest<unknown> = async (e) => {
 
 export const authTokenShouldBeValid: ValidationTest<unknown> = async (e) => {
   const authTokStr = pluckAuthTokenFromEvent(e)
-  const tokenObj = (await accessToken().fromString(authTokStr ?? '')).obj
-  const doesVerify = !!tokenObj
+  const tokenObj = (await accessToken().fromString(authTokStr ?? '').catch(() => ({ obj: null })))
+  const doesVerify = !!tokenObj.obj
   // since from string does not do data validation - just a type cast
   // do not remove this validation, until  we move to a io-ts validation
-  const hasAllElems = hasElements('uacct', 'email', 'last25')(tokenObj)
+  const hasAllElems = hasElements('uacct', 'email', 'last25')(tokenObj.obj)
 
   // console.log({ tokenObj, doesVerify, hasAllElems })
 
@@ -194,13 +194,10 @@ export const authTokenShouldBeValid: ValidationTest<unknown> = async (e) => {
 export const authTokenShouldContainValidUacct = (sidecarKey:string): ValidationTest<unknown> => async (e) => {
   const token = pluckAuthTokenFromEvent(e)
   if (token) {
-    const tokenData = (await accessToken().fromString(token)).obj
-    const usr = tokenData?.uacct
-      ? await user.getByID(tokenData.uacct).catch(er => undefined)
-      : await Promise.resolve(undefined)
-
-    const expensiveData = { [sidecarKey]: usr } as {[str:string] : unknown }
+    const tokenData = await accessToken().fromString(token).catch(() => ({ obj: { uacct: undefined } }))
+    const usr = await user.getByID(tokenData.obj?.uacct).catch(er => undefined)
     const passed = !!usr
+    const expensiveData = { [sidecarKey]: usr } as {[str:string] : unknown }
 
     return {
       code: 400,
@@ -235,30 +232,39 @@ export const challengeTOTPShouldBeValid: ValidationTest<AuthZFlatPartial> = asyn
     const TFAtype = d.TFAtype
 
     if (d.uacct) {
-      if (TFAtype === 'TOTP') {
-        return {
-          code: 400,
-          reason: 'Invalid TFA TOTP Challenge Rxesponse',
-          passed: !!challengeResp && await user.otp.isValidOTP(d.uacct, challengeResp),
-          InvalidDataLoc: 'H > Q > C',
-          InvalidDataVal: challengeResp
-        }
-      } else if (TFAtype === 'U2F') {
-        return {
-          code: 400,
-          reason: 'Invalid TFA Challenge - U2F is not yet implemented',
-          passed: false,
-          InvalidDataLoc: 'H > Q > C',
-          InvalidDataVal: challengeResp
-        }
-      } else {
-        return {
-          code: 400,
-          reason: 'Invalid TFA Type',
-          passed: false,
-          InvalidDataLoc: 'H > Q > C',
-          InvalidDataVal: d.TFAtype
-        }
+      switch (TFAtype) {
+        case 'TOTP':
+          return {
+            code: 400,
+            reason: 'Invalid TFA TOTP Challenge Rxesponse',
+            passed: !!challengeResp && await user.otp.isValidOTP(d.uacct, challengeResp),
+            InvalidDataLoc: 'H > Q > C',
+            InvalidDataVal: challengeResp
+          }
+        case 'U2F':
+          return {
+            code: 400,
+            reason: 'Invalid TFA Challenge - U2F is not yet implemented',
+            passed: false,
+            InvalidDataLoc: 'H > Q > C',
+            InvalidDataVal: challengeResp
+          }
+        case 'Backup':
+          return {
+            code: 400,
+            reason: 'Invalid TFA Challenge - U2F is not yet implemented',
+            passed: !!challengeResp && await user.otp.isValidOTP(d.uacct, challengeResp),
+            InvalidDataLoc: 'H > Q > C',
+            InvalidDataVal: challengeResp
+          }
+        default:
+          return {
+            code: 400,
+            reason: 'Invalid TFA Type',
+            passed: false,
+            InvalidDataLoc: 'H > Q > C',
+            InvalidDataVal: d.TFAtype
+          }
       }
     } else {
       return {

@@ -1,5 +1,6 @@
 /* globals test expect describe beforeAll afterAll */
-import { user, UseBase } from '../../server/entities'
+// UserBase
+import { user } from '../../server/entities'
 // import { appTable } from '../../server/entities/entities'
 import { authenticator } from 'otplib'
 import bcrypt from 'bcryptjs'
@@ -67,7 +68,7 @@ test('User - gen 2FA.TOTP', async () => {
 
 test('User - gen 2FA.U2F', async () => {
   const uacct = 'ericdmoore'
-  const t = await user.otp.gen2FA(uacct, 'U2F')
+  const t = await user.otp.gen2FA(uacct, { strategy: 'U2F' })
   //
   // start with it removed
   // removed for storage reasons
@@ -80,7 +81,7 @@ test('User - gen 2FA.U2F', async () => {
 
 test('User - gen 2FA.SMS', async () => {
   const uacct = 'ericdmoore'
-  const t = await user.otp.gen2FA(uacct, 'SMS')
+  const t = await user.otp.gen2FA(uacct, { strategy: 'SMS' })
   //
   // start with it removed
   // removed for storage reasons
@@ -123,7 +124,7 @@ describe('Using a Test Harness', () => {
       displayName: 'Yoo Sir',
       passwordPlainText: 'myPassword1',
       email: 'user.user@example.com',
-      oobTokens: [{ secret: 'DEADBEEF1', strategy: 'TOTP', uri: '', label: 'myLabelYS' }],
+      oobTokens: [{ secret: 'DEADBEEF1', strategy: 'TOTP' as 'TOTP', uri: '', label: 'myLabelYS' }],
       backupCodes: ['ys1', 'ys2', 'ys3', 'ys4', 'ys5']
     },
     {
@@ -131,10 +132,10 @@ describe('Using a Test Harness', () => {
       displayName: 'Timothy',
       passwordPlainText: 'myPassword2',
       email: 'user.tim.test@example.com',
-      oobTokens: [{ secret: 'DEADBEEF2', strategy: 'TOTP', uri: '', label: 'myLabelTim' }],
-      backupCodes: ['', '', '', '', '']
+      oobTokens: [{ secret: 'DEADBEEF2', strategy: 'TOTP' as 'TOTP', uri: '', label: 'myLabelTim' }],
+      backupCodes: ['usrTim1', 'usrTim2', 'usrTim3', 'usrTim4', 'usrTim5']
     }
-  ] as UseBase[]
+  ]
 
   beforeAll(async () => {
     await user.batch.put(...userList)

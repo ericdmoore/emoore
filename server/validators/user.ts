@@ -57,12 +57,21 @@ export const pluckUpdateFields = (e:Evt) => {
   }
 }
 
+/**
+ * ### pluckDeleteFields
+ * looks for these params:
+ * - rmUacct
+ * - rmTOTPLabel
+ * - rmTOTPSecret
+ * - rmBackupCode
+ */
 export const pluckDeleteFields = (e:Evt) => {
   const rmUacctID = pluckDataFor('rmUacct')(e, undefined) //  uacctID
   const rmDelegateToken = pluckDataFor('rmDelegationToken')(e, undefined) // delegateToken
   const rmTOTPlabel = pluckDataFor('rmTOTPLabel')(e, undefined) // TOTP-label
   const rmTOTPsecret = pluckDataFor('rmTOTPSecret')(e, undefined) // TOTP-label
-  return { rmUacctID, rmDelegateToken, rmTOTPlabel, rmTOTPsecret }
+  const rmBackupCode = pluckDataFor('rmBackupCode')(e, undefined) // TOTP-label
+  return { rmUacctID, rmDelegateToken, rmTOTPlabel, rmTOTPsecret, rmBackupCode }
 }
 
 export const reqHasUpdatableFields: ValidationTest<Partial<FlatPostUserInfo>> = async (e) => {
@@ -116,23 +125,14 @@ export const hasAllRequiredFields = (keys:string[], reason:string): ValidationTe
 
 export const acceptanceTokenSigShouldMatchInlineInfo: ValidationTest<FlatPostUserInfo> = async (e, c, d) => {
   const { acceptanceTok, ...uInfo } = d
-  const { obj } = await acceptanceToken().fromString(acceptanceTok ?? '')
+  const { obj } = await acceptanceToken().fromString(acceptanceTok ?? '').catch(() => ({ obj: null }))
+  const { auto, ...objInfo } = uInfo
 
-  // const { auto, ...userInfo } = pluckUserSetupInfo(e)
+  // dont compare uInfo since it has extra keys
+  const passed = deepEq({ uacct: undefined, ...obj }, objInfo)
 
-  const passed = deepEq({
-    uacct: obj.uacct,
-    email: obj.email,
-    passwordPlainText: obj.passwordPlainText
-  }, {
-    uacct: uInfo.uacct,
-    email: uInfo.email,
-    passwordPlainText: uInfo.passwordPlainText
-  })
-
-  // console.log({ obj, uInfo, passed })
-
-  // console.log({ accTokenObj, userInfo })
+  // console.log({ d })
+  // console.log({ objInfo, obj, passed })
   // console.log({ passed })
 
   return {

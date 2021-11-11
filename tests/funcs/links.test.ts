@@ -169,7 +169,7 @@ describe('POST /links', () => {
     const e = {
       ...evt,
       headers: {
-        longpaths: encodeURIComponent('https://im.ericdmoore.com')
+        longpaths: encodeURIComponent('["https://im.ericdmoore.com"]')
       }
     }
 

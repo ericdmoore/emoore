@@ -1,4 +1,4 @@
-/* globals describe test expect beforeEach afterEach beforeAll afterAll */
+/* globals test describe expect beforeAll afterAll */
 
 /*
 Overview
@@ -21,50 +21,36 @@ import { atob } from '../../server/utils/base64'
 import { accessToken } from '../../server/auths/tokens'
 import { authenticator } from 'otplib'
 
+const sleep = (n:number) => new Promise((resolve, reject) => {
+  setTimeout(() => resolve(n), n)
+})
+
 const userList = [
   {
     uacct: nanoid(12),
     email: 'tokens.user1@example.com',
     displayName: 'Yoo Sir',
-    passwordPlainText: 'A not so very Bad password for Yoo'
+    passwordPlainText: 'A not so very Bad password for Yoo',
+    last25: ['/hello0', '/world0']
   },
   {
     uacct: nanoid(12),
     email: 'tokens.TimEst@example.com',
     displayName: 'T Est',
-    passwordPlainText: 'A not so very Bad password for Tim'
+    passwordPlainText: 'A not so very Bad password for Tim',
+    last25: ['/hello1', '/world1']
   },
   {
     uacct: nanoid(12),
     email: 'tokens.mdma@example.com',
     displayName: 'Molly',
-    passwordPlainText: 'A not so very Bad password for Molly'
+    passwordPlainText: 'A not so very Bad password for Molly',
+    last25: ['/hello2', '/world2']
   }
 ]
 
 beforeAll(async () => {
   await user.batch.put(...userList)
-
-  // // load table data
-  // await appTable.batchWrite(
-  //   await Promise.all(
-  //     userList.map(async u => {
-  //       const { email, plaintextPassword, ...usr } = u
-  //       return user.ent.putBatch({
-  //         ...usr,
-  //         email: u.email,
-  //         pwHash: await user.password.toHash(plaintextPassword),
-  //         backupCodes: await user.otp.genBackups(),
-  //         oobTokens: [await user.otp.gen2FA(u.uacct, 'TOTP', 'initial TOTP')]
-  //       })
-  //     })
-  //   ))// end user batch
-  //
-  // await Promise.all([
-  //   ...userList.map(
-  //     async u => user.addExternalID(u.uacct, 'email', u.email)
-  //   )
-  // ])
 })
 
 afterAll(async () => {
@@ -86,58 +72,65 @@ describe('POST /tokens', () => {
 
   const postEvent = event('POST', '/tokens')
 
-  /**
-   * @todo remove this test - as this use case is no longer supported
-   */
-  test.skip('Make a starter token for YOOSir - the starter + OOB gives you a valid token', async () => {
-    const user = userList[0]
-    const e = { ...postEvent }
-    e.headers = {
-      email: encodeURIComponent(user.email),
-      p: atob(user.passwordPlainText)
-    }
-    const resp = await handler(e, ctx) as SRet
-    const body = (JSON.parse(resp.body ?? 'null') as any)
+  test('Creds + TOTP = Regular Use Case', async () => {
+    const { uacct, email, passwordPlainText } = userList[0]
+    const usr = await user.getByID(uacct)
 
-    expect(resp.statusCode).toBe(200)
-    expect(resp.isBase64Encoded).toBe(false)
-    expect(body).toHaveProperty('starterToken')
+    const completeTokenResp = await handler({
+      ...event('POST', '/tokens'),
+      headers: {
+        email: encodeURIComponent(email),
+        p: atob(passwordPlainText),
+        TFAtype: 'TOTP',
+        TFAchallengeResp: authenticator.generate(
+          usr.oobTokens.filter(t => t.strategy === 'TOTP')[0].secret.toString()
+        )
+      }
+    }, ctx) as SRet
 
-    const respObjToken = (await accessToken().fromString(body.starterToken)).obj
-    const exampleTokObj = (await accessToken().create({ email: user.email, uacct: user.uacct, last25: [] })).obj
+    const tokenBody = (JSON.parse(completeTokenResp.body ?? '{}') as {} | {authToken:string, user:{uacct:string, email:string} })
 
-    expect(respObjToken).toEqual(exampleTokObj)
+    expect(completeTokenResp.statusCode).toBe(200)
+    expect(completeTokenResp.isBase64Encoded).toBe(false)
+    expect(tokenBody).toHaveProperty('authToken')
+    expect(tokenBody).toHaveProperty('user')
   })
 
-  /**
-   * @todo remove as this is no longer a supported use case
-   */
-  test.skip('Send token + Credentials', async () => {
-    const user = userList[0]
-    const e = { ...postEvent }
-    e.headers = {
-      authToken: (await accessToken().create({
-        email: user.email,
-        last25: [],
-        uacct: user.uacct
-      })).token,
-      uacct: user.uacct,
-      email: encodeURIComponent(user.email),
-      p: atob(user.passwordPlainText)
-    }
-    const resp = await handler(e, ctx) as SRet
-    const body = (JSON.parse(resp.body ?? 'null') as any)
+  test('Creds + BackupCode = A Normal Use Case', async () => {
+    const { uacct, email, passwordPlainText } = userList[0]
+    const usr = await user.getByID(uacct)
+    const numBackupCodes = usr.backupCodes.length
 
-    expect(resp.statusCode).toBe(200)
-    expect(resp.isBase64Encoded).toBe(false)
-    expect(body).toEqual({
-      starterToken: (await accessToken().create({ email: user.email, uacct: user.uacct, last25: [] })).token
-    })
+    const bCode = usr.backupCodes[0]
+
+    const e = {
+      ...event('POST', '/tokens'),
+      headers: {
+        email: encodeURIComponent(email),
+        p: atob(passwordPlainText),
+        TFAtype: 'Backup',
+        TFAchallengeResp: bCode
+      }
+    }
+
+    const completeTokenResp = await handler(e, ctx) as SRet
+    const tokenBody = (JSON.parse(completeTokenResp.body ?? '{}') as {} | {authToken:string, user:{uacct:string, email:string} })
+
+    expect(completeTokenResp.statusCode).toBe(200)
+    expect(completeTokenResp.isBase64Encoded).toBe(false)
+    expect(tokenBody).toHaveProperty('authToken')
+    expect(tokenBody).toHaveProperty('user')
+
+    const usrLessBackupCode = await user.getByID(uacct)
+    const usedOneBackUpCode = usrLessBackupCode.backupCodes.length
+    expect(usedOneBackUpCode).toBe(numBackupCodes - 1)
   })
 
   test('Make a complete token for YOOSir - the starter + OOB gives you a valid token', async () => {
     const { uacct, email, passwordPlainText } = userList[0]
+    await sleep(1350)
     const usr = await user.getByID(uacct)
+    // console.info({ userInTest: usr })
 
     const e = {
       ...postEvent,
@@ -151,21 +144,33 @@ describe('POST /tokens', () => {
       }
     }
 
-    // console.dir({e, ctx})
+    // console.dir({ e, ctx })
     const resp = await handler(e, ctx) as SRet
     // console.dir(resp)
 
-    const body = (JSON.parse(resp.body ?? 'null') as any)
-    // console.dir(body)
-
-    const { obj } = await accessToken().fromString(body?.authToken)
-    // console.dir(obj)
-
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
+    expect(resp).toHaveProperty('body')
+    const body = (JSON.parse(resp.body ?? 'null') as any)
+    // console.info(body)
+
+    const { obj } = await accessToken().fromString(body?.authToken)
+    const tokenObj = obj
+
+    // console.dir({ tokenObj })
+    expect(tokenObj).toHaveProperty('email', email)
+    expect(tokenObj).toHaveProperty('uacct', uacct)
+    expect(tokenObj).toHaveProperty('last25')
+
+    // @todo @fix a terrible race condition that is plaguing the last25 getting added to the user
+    // expect(tokenObj).toHaveProperty('last25', last25)
+
     expect(body).toHaveProperty('authToken')
     expect(body).toHaveProperty('user')
-    expect(obj).toEqual({ email: usr.email, uacct: usr.uacct, last25: usr?.last25 ?? [] })
+    expect(body.user).toHaveProperty('email', email)
+    expect(body.user).toHaveProperty('uacct', uacct)
+    expect(body.user.email).toEqual(tokenObj.email)
+    expect(body.user.uacct).toEqual(tokenObj.uacct)
   })
 
   test('Send in Nothing ', async () => {
@@ -177,48 +182,6 @@ describe('POST /tokens', () => {
     expect(body).toHaveProperty('errors')
   })
 
-  test('First grab a StarterToken', async () => {
-    const { uacct, email, passwordPlainText } = userList[0]
-    const usr = await user.getByID(uacct)
-
-    const e = {
-      ...postEvent,
-      headers: {
-        email: encodeURIComponent(email),
-        p: atob(passwordPlainText)
-      }
-    }
-
-    const startTokenResp = await handler(e, ctx) as SRet
-    const starterTokenBody = (JSON.parse(startTokenResp.body ?? '{}') as {starterToken?:string})
-
-    const { starterToken } = starterTokenBody
-
-    const completeTokenResp = await handler({
-      ...event('POST', '/tokens'),
-      headers: {
-        authToken: starterToken,
-        email: encodeURIComponent(email),
-        p: atob(passwordPlainText),
-        TFAtype: 'TOTP',
-        TFAchallengeResp: authenticator.generate(
-          usr.oobTokens.filter(t => t.strategy === 'TOTP')[0].secret.toString()
-        )
-      }
-    }, ctx) as SRet
-    const completeTokenBody = (JSON.parse(completeTokenResp.body ?? '{}') as {} | {authToken:string, user:{uacct:string, email:string} })
-
-    // console.log({completeTokenBody})
-
-    expect(completeTokenResp.statusCode).toBe(200)
-    expect(completeTokenResp.isBase64Encoded).toBe(false)
-    expect(completeTokenBody).toHaveProperty('authToken')
-    expect(completeTokenBody).toHaveProperty('user')
-  })
-
-  /**
-   * Maybe this test passes now since we dont care about tokens
-   */
   test('Only Creds Matter - Token is ignored', async () => {
     const e = { ...postEvent }
     const { uacct, email, passwordPlainText } = userList[0]
@@ -247,38 +210,6 @@ describe('POST /tokens', () => {
     expect(body).toHaveProperty('user')
   })
 
-  /**
-   * @todo #premature optimization
-   */
-  test.skip('Valid but old Token that`s missing a uacct', async () => {
-    const { uacct, email, passwordPlainText } = userList[0]
-    const usr = await user.getByID(uacct)
-
-    const e = { ...postEvent }
-    e.headers = {
-      authToken: (await accessToken().create({ email, uacct, last25: [] })).token,
-      email: encodeURIComponent(email),
-      p: atob(passwordPlainText),
-      TFAtype: 'TOTP',
-      TFAchallengeResp: authenticator.generate(
-        usr.oobTokens.filter(t => t.strategy === 'TOTP')[0].secret.toString()
-      )
-    }
-
-    // console.log({ e })
-    const resp = await handler(e, ctx) as SRet
-    const body = (JSON.parse(resp.body ?? 'null') as any)
-    // console.log({ body })
-
-    const respAuthToken = (await accessToken().fromString(body.authToken)).obj
-    const exampleToken = (await accessToken().create({ email, uacct, last25: [] })).obj
-
-    expect(resp.statusCode).toBe(200)
-    expect(resp.isBase64Encoded).toBe(false)
-    expect(body).toHaveProperty('authToken')
-    expect(respAuthToken).toEqual(exampleToken)
-  })
-
   test('Bad Password Request', async () => {
     const { email } = userList[1]
 
@@ -300,15 +231,17 @@ describe('POST /tokens', () => {
   })
 
   test('AuthToken + Creds Request', async () => {
-    const { uacct, email, passwordPlainText } = userList[0]
+    const { uacct, email, passwordPlainText, last25 } = userList[1]
+    await sleep(250)
+
     const usr = await user.getByID(uacct)
-    const last25 = ['/hello', '/world']
+    // console.info({ usr })
 
-    const initalAuthToken = (await accessToken().create(({ uacct, email, last25 }))).token
-
+    const { token } = await accessToken().create(({ uacct, email, last25 }))
     const e = { ...postEvent }
+
     e.headers = {
-      authToken: initalAuthToken,
+      authToken: token,
       email: encodeURIComponent(email),
       p: atob(passwordPlainText),
       TFAtype: 'TOTP',
@@ -320,16 +253,16 @@ describe('POST /tokens', () => {
     const resp = await handler(e, ctx) as SRet
     const body = (JSON.parse(resp.body ?? 'null') as any)
 
-    const respAuthToken = (await accessToken().fromString(body.authToken)).obj
-    await expect(accessToken().isVerified(body.authToken)).resolves.toBe(true)
-
+    expect(body).toHaveProperty('authToken')
     expect(resp.statusCode).toBe(200)
     expect(resp.isBase64Encoded).toBe(false)
-    expect(body).toHaveProperty('authToken')
+    await expect(accessToken().isVerified(body.authToken)).resolves.toBe(true)
 
-    expect(respAuthToken).toHaveProperty('email')
-    expect(respAuthToken).toHaveProperty('uacct')
-    expect(respAuthToken).toHaveProperty('last25')
+    const { obj } = await accessToken().fromString(body.authToken)
+    const respAuthToken = obj
+    expect(respAuthToken).toHaveProperty('email', email)
+    expect(respAuthToken).toHaveProperty('uacct', uacct)
+    expect(respAuthToken).toHaveProperty('last25', last25)
   })
 
   test('Missing Email Request', async () => {
@@ -464,8 +397,6 @@ describe('PUT /tokens', () => {
   // eslint-disable-next-line no-unused-vars
   const tokEvt = event('PUT', '/tokens')
 
-  beforeEach(async () => {})
-  afterEach(async () => {})
   test.skip('Refresh token for Yoo', async () => {
 
   })

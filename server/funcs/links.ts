@@ -137,6 +137,7 @@ export const postResponder:Responder<{}> = async (_, e) => {
         ? await link.create({ long: s })
         : await link.create(s)
       ))
+
   await link.batch.put(...links)
   await userAccess.batch.put(...links)
 
