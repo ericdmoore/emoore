@@ -1,24 +1,23 @@
 /**
  * @author Eric D Moore
- * 
+ *
  */
 
-import { createCipheriv, createDecipheriv, } from 'crypto'
-import crumpet  from './crumpetBakery'
+// import { createCipheriv, createDecipheriv } from 'crypto'
+import crumpet from './crumpetBakery'
 
-const atob = (i:any)=>Buffer.from(i).toString('base64')
-const btoa = (i:any)=>Buffer.from(i,'base64').toString('utf-8')
+// const atob = (i:any) => Buffer.from(i).toString('base64')
+// const btoa = (i:any) => Buffer.from(i, 'base64').toString('utf-8')
 
-;(async()=>{
-    const secret = 'someSecret'
-    const cmp = crumpet
-        .create('https://exmaple.com', secret,[['user','Eric']])
-        .addCaveats([['acct','5']])
-    const o = cmp.toJSON()
-
-
+;(async () => {
+  const secret = 'someSecret'
+  const cmp = crumpet
+    .create('https://exmaple.com', secret, { user: 'Eric' })
+    .addCaveats({ acct: '5' })
+  // eslint-disable-next-line no-unused-vars
+  const o = cmp.toJSON()
+  console.log({ o })
 })()
-
 
 // ;(async()=>{
 //     const secret1 = Buffer.alloc(32, 0x05)

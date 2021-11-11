@@ -6,12 +6,12 @@ const suite = new behch.Suite()
 
 suite.add('create crunmpet', () => {
   crumpet
-    .create('issuer', 'secret', [])
+    .create('issuer', 'secret')
 })
   .add('large addition chain', () => {
     crumpet
-      .create('issuer', 'secret', [])
-      .addCaveats([['k', 'v'], []])
+      .create('issuer', 'secret')
+      .addCaveats({ k: 'v' })
   })
   .on('cycle', function (event:Event) {
     console.log(JSON.stringify(event))

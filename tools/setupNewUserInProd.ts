@@ -41,6 +41,6 @@ console.log({ DISPLAYNAME })
 ;(async () => {
   const { user } = await import('../server/entities/users')
   // console.dir(user)
-  const r = await user.genUser(EMAIL, PASSWORD, UACCT, DISPLAYNAME)
+  const r = await user.genUser({ email: EMAIL, passwordPlainText: PASSWORD, uacct: UACCT })
   console.dir(r)
 })()

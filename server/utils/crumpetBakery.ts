@@ -271,6 +271,7 @@ const toFunction = (
 // #region helpers
 const lastOf = <T>(arr:T[]) => arr.slice(-1)[0]
 
+// eslint-disable-next-line no-unused-vars
 const getColumnOfSigs = async (secret:PromiseOR<string>, tupleData: Dict<string> = {}) => {
   const withSecretInRowZero = [[null, null, await secret], ...Object.entries(tupleData)]
     .map((c, i, a) => {
