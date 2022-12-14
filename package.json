@@ -63,7 +63,7 @@
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-promise": "^5.1.0",
     "esm": "^3.2.25",
-    "express": "^4.17.1",
+    "express": "^4.17.3",
     "getopts": "^2.3.0",
     "got": "^11.8.2",
     "graphql-config": "^3.2.0",
