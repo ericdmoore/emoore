@@ -93,7 +93,7 @@
     "globby": "^11.0.1",
     "hi-base32": "^0.5.1",
     "io-ts": "^2.2.16",
-    "jsonwebtoken": "^8.5.1",
+    "jsonwebtoken": "^9.0.0",
     "ksuid": "^2.0.0",
     "ky-universal": "^0.8.2",
     "memfs": "^3.2.0",
